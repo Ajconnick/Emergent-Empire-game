@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 gl = "*"
 sdl2 = { version = "*", features = ["bundled"] }
+nalgebra-glm = "*"

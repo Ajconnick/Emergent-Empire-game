@@ -107,6 +107,10 @@ impl Program {
             UseProgram(self.id);
         }
     }
+
+    pub fn id(&self) -> GLuint {
+        self.id
+    }
 }
 
 impl Drop for Program {
@@ -160,20 +164,20 @@ impl Vbo {
         self.data(data);
     }
 
+    fn bind(&self) {
+        unsafe {
+            gl::BindBuffer(gl::ARRAY_BUFFER, self.id);
+        }
+    }
+
     fn data(&self, vertices: &Vec<f32>) {
         unsafe {
             gl::BufferData(
                 gl::ARRAY_BUFFER,
                 (vertices.len() * std::mem::size_of::<f32>()) as gl::types::GLsizeiptr,
                 vertices.as_ptr() as *const gl::types::GLvoid,
-                gl::DYNAMIC_DRAW,
+                gl::STATIC_DRAW,
             );
-        }
-    }
-
-    fn bind(&self) {
-        unsafe {
-            gl::BindBuffer(gl::ARRAY_BUFFER, self.id);
         }
     }
 
@@ -267,20 +271,20 @@ impl Vao {
         Vao { id }
     }
 
-    pub fn set(&self) {
+    pub fn set(&self, loc: u32) {
+        self.enable(loc);
         self.bind();
-        self.setup();
+        self.setup(loc);
     }
 
-    fn setup(&self) {
+    fn setup(&self, loc: u32) {
         unsafe {
-            gl::EnableVertexAttribArray(0);
             gl::VertexAttribPointer(
-                0,
-                2,
+                loc,
+                3,
                 gl::FLOAT,
                 gl::FALSE,
-                (2 * std::mem::size_of::<f32>()) as GLint,
+                (3 * std::mem::size_of::<f32>()) as GLint,
                 null(),
             );
         }
@@ -289,6 +293,12 @@ impl Vao {
     fn bind(&self) {
         unsafe {
             gl::BindVertexArray(self.id);
+        }
+    }
+
+    fn enable(&self, loc: u32) {
+        unsafe {
+            gl::EnableVertexAttribArray(loc);
         }
     }
 
@@ -309,5 +319,20 @@ impl Drop for Vao {
     fn drop(&mut self) {
         self.unbind();
         self.delete();
+    }
+}
+
+pub struct Uniform {
+    pub id: GLint,
+}
+
+impl Uniform {
+    pub fn new(program: u32, name: &str) -> Result<Self, &'static str> {
+        let cname: CString = CString::new(name).expect("CString::new failed");
+        let location: GLint = unsafe { gl::GetUniformLocation(program, cname.as_ptr()) };
+        if location == -1 {
+            return Err("Couldn't get a uniform location");
+        }
+        Ok(Uniform { id: location })
     }
 }

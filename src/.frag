@@ -1,8 +1,12 @@
 #version 330 core
 
+in vec4 fragmentColor;
+
 out vec4 Color;
+
+uniform float u_time;
 
 void main()
 {
-    Color = vec4(1.0, 0.902, 0.0, 1.0);
+    Color = fragmentColor;
 }
