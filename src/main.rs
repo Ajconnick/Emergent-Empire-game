@@ -8,6 +8,8 @@ use std::f32::consts::PI;
 use std::ptr::null;
 use std::time::Instant;
 
+use obj::{load_obj, Obj, Vertex};
+
 fn main() -> Result <(), String> {
     let screen_width = 600;
     let screen_height = 600;
@@ -40,9 +42,10 @@ fn main() -> Result <(), String> {
     unsafe {
         gl::Enable(gl::DEPTH_TEST);
         gl::DepthFunc(gl::LESS);
-        gl::Enable(gl::CULL_FACE);
+        // gl::Enable(gl::CULL_FACE);
     }
 
+    // MATRICES
     let mut model_matrix: nalgebra_glm::Mat4 = nalgebra_glm::one();
     model_matrix = nalgebra_glm::rotate_y(&model_matrix, 1.5);
     let mut view_matrix: nalgebra_glm::Mat4 = nalgebra_glm::look_at(
@@ -50,14 +53,11 @@ fn main() -> Result <(), String> {
         &nalgebra_glm::vec3(0.0,  0.0,  -0.0), 
         &nalgebra_glm::vec3(0.0,  1.0,  0.0)
     );
-
     let mut proj_matrix: nalgebra_glm::Mat4 = nalgebra_glm::perspective(1.0, 1.5, 0.01, 100.0);
 
+    // OPEN GL SHADERS 'N SHIET!
     let program = create_program().unwrap();
     program.set();
-
-    let vertices = cube();
-    let colors = cube_colors();
 
     // These Uniforms allow us to pass data (ex: window size, elapsed time) to the GPU shaders
     let u_resolution = Uniform::new(program.id(), "u_resolution").unwrap();
@@ -75,17 +75,20 @@ fn main() -> Result <(), String> {
         gl::UniformMatrix4fv(u_proj_matrix.id, 1, gl::FALSE, &proj_matrix.columns(0, 4)[0]);
     }
 
-    let vao = Vao::gen(); // glGenVertexArrays
-    vao.set(0); // glBindVertexArray
-    let vbo = Vbo::gen(); // genBuffers
-    vbo.set(&vertices); // bindBuffer, bufferData
-    let colors_vbo = Vbo::gen();// genBuffers
-    colors_vbo.set(&colors); // bindBuffer, bufferData
+    let input = include_bytes!("../res/ico-sphere.obj");
+    let obj: Obj = load_obj(&input[..]).unwrap();
+    let vb = obj.vertices;
+    let mut indices = obj.indices;
+    let mut vertices = flatten(vb);
+
+    let vbo = Vbo::gen();
+    let vao = Vao::gen();
+    let ibo = Ibo::gen();
 
     let mut running = true;
     let mut event_queue = sdl_context.event_pump().unwrap();
     let start = Instant::now();
-    let mut seconds_elapsed: u32 = 0;
+    let mut seconds_elapsed: u16 = 0;
 
     while running {
         for event in event_queue.poll_iter() {
@@ -112,50 +115,37 @@ fn main() -> Result <(), String> {
             }
         }
 
+            
+        model_matrix = nalgebra_glm::one();
+        // model_matrix = nalgebra_glm::translate(&model_matrix, &nalgebra_glm::vec3(0.0, start.elapsed().as_secs_f32().sin() * 5.0, 0.0));
+        model_matrix = nalgebra_glm::rotate_y(&model_matrix, start.elapsed().as_secs_f32() * 10.0);
+        view_matrix = nalgebra_glm::look_at(
+            &nalgebra_glm::vec3(5.0, 0.0,  0.0), 
+            &nalgebra_glm::vec3(0.0,  0.0,  0.0), 
+            &nalgebra_glm::vec3(0.0,  1.0,  0.0)
+        );
+        proj_matrix = nalgebra_glm::perspective(1.0, 1.0, 0.01, 100.0);
+            
+
         unsafe {
             gl::ClearColor(0./255., 0./255., 20./255., 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
-            
-            model_matrix = nalgebra_glm::one();
-            model_matrix = nalgebra_glm::rotate_x(&model_matrix, start.elapsed().as_secs_f32());
-            view_matrix = nalgebra_glm::look_at(
-                &nalgebra_glm::vec3(start.elapsed().as_secs_f32().sin() * 5.0, 5.0 * start.elapsed().as_secs_f32().cos(),  5.0 * start.elapsed().as_secs_f32().cos()), 
-                &nalgebra_glm::vec3(0.0,  0.0,  0.0), 
-                &nalgebra_glm::vec3(0.0,  1.0,  0.0)
-            );
-            proj_matrix = nalgebra_glm::perspective(1.0, 1.5, 0.01, 100.0);
 
             // gl::Uniform1f(u_time.id, start.elapsed().as_secs_f32());
             gl::UniformMatrix4fv(u_model_matrix.id, 1, gl::FALSE, &model_matrix.columns(0, 4)[0]);
             gl::UniformMatrix4fv(u_view_matrix.id, 1, gl::FALSE, &view_matrix.columns(0, 4)[0]);
             gl::UniformMatrix4fv(u_proj_matrix.id, 1, gl::FALSE, &proj_matrix.columns(0, 4)[0]);
-            
-            gl::EnableVertexAttribArray(0);
-            gl::BindBuffer(gl::ARRAY_BUFFER, vbo.id);
-            gl::VertexAttribPointer(
-                0,
-                3,
-                gl::FLOAT,
-                gl::FALSE,
-                0,
-                null(),
-            );
 
-            gl::EnableVertexAttribArray(1);
-            gl::BindBuffer(gl::ARRAY_BUFFER, colors_vbo.id);
-            gl::VertexAttribPointer(
-                1,
-                3,
-                gl::FLOAT,
-                gl::FALSE,
-                0,
-                null(),
-            );
+            // (vertices, indices) = triangle_fan(5);
+            vbo.set(&vertices);
+            vao.set();
+            ibo.set(&vec_u32_from_vec_u16(indices.clone()));
 
-            gl::DrawArrays(
+            gl::DrawElements(
                 gl::TRIANGLES,
-                0,
-                12*3,
+                indices.len() as i32,
+                gl::UNSIGNED_INT,
+                0 as *const _,
             );
         }
 
@@ -167,10 +157,28 @@ fn main() -> Result <(), String> {
     Ok(())
 }
 
+fn flatten(vertices: Vec<Vertex>) -> Vec<f32> {
+    let mut retval = vec![];
+    for vertex in vertices {
+        retval.push(vertex.position[0]);
+        retval.push(vertex.position[1]);
+        retval.push(vertex.position[2]);
+    };
+    retval
+}
+
+fn vec_u32_from_vec_u16(input: Vec<u16>) -> Vec<u32> {
+    let mut retval = vec![];
+    for x in input {
+        retval.push(x as u32);
+    }
+    retval
+}
+
 fn triangle_fan(n: u32) -> (Vec<f32>, Vec<u32>) {
     let mut vertices: Vec<f32> = vec![
-        0.0, 0.0,
-        0.5, 0.0,
+        0.0, 0.0, 0.0,
+        0.5, 0.0, 0.0
     ];
     let mut indices: Vec<u32> = vec![];
 
@@ -179,6 +187,7 @@ fn triangle_fan(n: u32) -> (Vec<f32>, Vec<u32>) {
         angle = 2. * PI * m as f32 / n as f32;
         vertices.push(angle.cos() * 0.5);
         vertices.push(angle.sin() * 0.5);
+        vertices.push(0.0);
 
         indices.push(0);
         indices.push(m);
@@ -189,86 +198,4 @@ fn triangle_fan(n: u32) -> (Vec<f32>, Vec<u32>) {
     indices.push(1);
 
     (vertices, indices)
-}
-
-fn cube() -> Vec<f32> {
-    vec![
-        -1.0,-1.0,-1.0, // triangle 1 : begin
-        -1.0,-1.0, 1.0,
-        -1.0, 1.0, 1.0, // triangle 1 : end
-        1.0, 1.0,-1.0, // triangle 2 : begin
-        -1.0,-1.0,-1.0,
-        -1.0, 1.0,-1.0, // triangle 2 : end
-        1.0,-1.0, 1.0,
-        -1.0,-1.0,-1.0,
-        1.0,-1.0,-1.0,
-        1.0, 1.0,-1.0,
-        1.0,-1.0,-1.0,
-        -1.0,-1.0,-1.0,
-        -1.0,-1.0,-1.0,
-        -1.0, 1.0, 1.0,
-        -1.0, 1.0,-1.0,
-        1.0,-1.0, 1.0,
-        -1.0,-1.0, 1.0,
-        -1.0,-1.0,-1.0,
-        -1.0, 1.0, 1.0,
-        -1.0,-1.0, 1.0,
-        1.0,-1.0, 1.0,
-        1.0, 1.0, 1.0,
-        1.0,-1.0,-1.0,
-        1.0, 1.0,-1.0,
-        1.0,-1.0,-1.0,
-        1.0, 1.0, 1.0,
-        1.0,-1.0, 1.0,
-        1.0, 1.0, 1.0,
-        1.0, 1.0,-1.0,
-        -1.0, 1.0,-1.0,
-        1.0, 1.0, 1.0,
-        -1.0, 1.0,-1.0,
-        -1.0, 1.0, 1.0,
-        1.0, 1.0, 1.0,
-        -1.0, 1.0, 1.0,
-        1.0,-1.0, 1.0
-    ]
-}
-
-fn cube_colors() -> Vec<f32> {
-    vec![
-        0.583,  0.771,  0.014,
-        0.609,  0.115,  0.436,
-        0.327,  0.483,  0.844,
-        0.822,  0.569,  0.201,
-        0.435,  0.602,  0.223,
-        0.310,  0.747,  0.185,
-        0.597,  0.770,  0.761,
-        0.559,  0.436,  0.730,
-        0.359,  0.583,  0.152,
-        0.483,  0.596,  0.789,
-        0.559,  0.861,  0.639,
-        0.195,  0.548,  0.859,
-        0.014,  0.184,  0.576,
-        0.771,  0.328,  0.970,
-        0.406,  0.615,  0.116,
-        0.676,  0.977,  0.133,
-        0.971,  0.572,  0.833,
-        0.140,  0.616,  0.489,
-        0.997,  0.513,  0.064,
-        0.945,  0.719,  0.592,
-        0.543,  0.021,  0.978,
-        0.279,  0.317,  0.505,
-        0.167,  0.620,  0.077,
-        0.347,  0.857,  0.137,
-        0.055,  0.953,  0.042,
-        0.714,  0.505,  0.345,
-        0.783,  0.290,  0.734,
-        0.722,  0.645,  0.174,
-        0.302,  0.455,  0.848,
-        0.225,  0.587,  0.040,
-        0.517,  0.713,  0.338,
-        0.053,  0.959,  0.120,
-        0.393,  0.621,  0.362,
-        0.673,  0.211,  0.457,
-        0.820,  0.883,  0.371,
-        0.982,  0.099,  0.879
-    ]
 }

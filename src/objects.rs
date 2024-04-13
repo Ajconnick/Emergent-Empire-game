@@ -271,16 +271,16 @@ impl Vao {
         Vao { id }
     }
 
-    pub fn set(&self, loc: u32) {
-        self.enable(loc);
+    pub fn set(&self) {
+        self.enable();
         self.bind();
-        self.setup(loc);
+        self.setup();
     }
 
-    fn setup(&self, loc: u32) {
+    fn setup(&self) {
         unsafe {
             gl::VertexAttribPointer(
-                loc,
+                0,
                 3,
                 gl::FLOAT,
                 gl::FALSE,
@@ -296,9 +296,9 @@ impl Vao {
         }
     }
 
-    fn enable(&self, loc: u32) {
+    fn enable(&self) {
         unsafe {
-            gl::EnableVertexAttribArray(loc);
+            gl::EnableVertexAttribArray(0);
         }
     }
 

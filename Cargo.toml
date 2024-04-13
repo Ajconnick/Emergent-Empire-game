@@ -9,3 +9,4 @@ edition = "2021"
 gl = "*"
 sdl2 = { version = "*", features = ["bundled"] }
 nalgebra-glm = "*"
+obj-rs = "*"
