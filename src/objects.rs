@@ -226,7 +226,7 @@ impl Ibo {
                 gl::ELEMENT_ARRAY_BUFFER,
                 (indices.len() * std::mem::size_of::<u32>()) as gl::types::GLsizeiptr,
                 indices.as_ptr() as *const gl::types::GLvoid,
-                gl::DYNAMIC_DRAW,
+                gl::STATIC_DRAW,
             );
         }
     }
@@ -271,34 +271,35 @@ impl Vao {
         Vao { id }
     }
 
-    pub fn set(&self) {
-        self.enable();
-        self.bind();
-        self.setup();
+    pub fn set(&self, loc: u32) {
+        self.bind(loc);
+        self.setup(loc);
     }
 
-    fn setup(&self) {
+    pub fn enable(&self, loc: u32) {
+        unsafe {
+            gl::EnableVertexAttribArray(loc);
+        }
+        self.setup(loc);
+    }
+
+    fn bind(&self, loc: u32) {
+        unsafe {
+            gl::EnableVertexAttribArray(loc);
+            gl::BindVertexArray(self.id);
+        }
+    }
+
+    fn setup(&self, loc: u32) {
         unsafe {
             gl::VertexAttribPointer(
-                0,
+                loc,
                 3,
                 gl::FLOAT,
                 gl::FALSE,
                 (3 * std::mem::size_of::<f32>()) as GLint,
                 null(),
             );
-        }
-    }
-
-    fn bind(&self) {
-        unsafe {
-            gl::BindVertexArray(self.id);
-        }
-    }
-
-    fn enable(&self) {
-        unsafe {
-            gl::EnableVertexAttribArray(0);
         }
     }
 

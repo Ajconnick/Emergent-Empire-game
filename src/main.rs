@@ -4,8 +4,6 @@ use sdl2::video::SwapInterval;
 mod objects;
 use objects::*;
 
-use std::f32::consts::PI;
-use std::ptr::null;
 use std::time::Instant;
 
 use obj::{load_obj, Obj, Vertex};
@@ -65,6 +63,7 @@ fn main() -> Result <(), String> {
     let u_model_matrix = Uniform::new(program.id(), "u_model_matrix").unwrap();
     let u_view_matrix = Uniform::new(program.id(), "u_view_matrix").unwrap();
     let u_proj_matrix = Uniform::new(program.id(), "u_proj_matrix").unwrap();
+    let u_sun_pos = Uniform::new(program.id(), "u_sun_pos_vec3").unwrap();
 
     unsafe { 
         gl::Uniform2f(u_resolution.id, 600., 600.);
@@ -73,22 +72,32 @@ fn main() -> Result <(), String> {
         gl::UniformMatrix4fv(u_model_matrix.id, 1, gl::FALSE, &model_matrix.columns(0, 4)[0]);
         gl::UniformMatrix4fv(u_view_matrix.id, 1, gl::FALSE, &view_matrix.columns(0, 4)[0]);
         gl::UniformMatrix4fv(u_proj_matrix.id, 1, gl::FALSE, &proj_matrix.columns(0, 4)[0]);
+        gl::Uniform3f(u_sun_pos.id, 0., 0., 0.);
     }
 
     let input = include_bytes!("../res/ico-sphere.obj");
     let obj: Obj = load_obj(&input[..]).unwrap();
     let vb = obj.vertices;
-    let mut indices = obj.indices;
-    let mut vertices = flatten(vb);
+    let indices = obj.indices;
+    let vertices = flatten_positions(&vb);
+    let normals = flatten_normals(&vb);
 
     let vbo = Vbo::gen();
     let vao = Vao::gen();
     let ibo = Ibo::gen();
+    let n_vbo = Vbo::gen();
+    let n_vao = Vao::gen();
+    let n_ibo = Ibo::gen();
+
+    vao.set(0);
+    vbo.set(&vertices);
+    ibo.set(&vec_u32_from_vec_u16(indices.clone()));
+    n_vbo.set(&normals);
+    n_ibo.set(&vec_u32_from_vec_u16(indices.clone()));
 
     let mut running = true;
     let mut event_queue = sdl_context.event_pump().unwrap();
     let start = Instant::now();
-    let mut seconds_elapsed: u16 = 0;
 
     while running {
         for event in event_queue.poll_iter() {
@@ -117,18 +126,17 @@ fn main() -> Result <(), String> {
 
             
         model_matrix = nalgebra_glm::one();
-        // model_matrix = nalgebra_glm::translate(&model_matrix, &nalgebra_glm::vec3(0.0, start.elapsed().as_secs_f32().sin() * 5.0, 0.0));
-        model_matrix = nalgebra_glm::rotate_y(&model_matrix, start.elapsed().as_secs_f32() * 10.0);
+        model_matrix = nalgebra_glm::translate(&model_matrix, &nalgebra_glm::vec3(10.0, 1.0, 0.0));
+        // model_matrix = nalgebra_glm::rotate_y(&model_matrix,  * 1.0);
         view_matrix = nalgebra_glm::look_at(
-            &nalgebra_glm::vec3(5.0, 0.0,  0.0), 
-            &nalgebra_glm::vec3(0.0,  0.0,  0.0), 
+            &nalgebra_glm::vec3(start.elapsed().as_secs_f32().cos() * 5.0 + 10.0, 1.0,  start.elapsed().as_secs_f32().sin() * 5.0), 
+            &nalgebra_glm::vec3(10.0,  1.0,  0.0), 
             &nalgebra_glm::vec3(0.0,  1.0,  0.0)
         );
-        proj_matrix = nalgebra_glm::perspective(1.0, 1.0, 0.01, 100.0);
+        proj_matrix = nalgebra_glm::perspective(1.0, 0.5, 0.01, 100.0);
             
-
         unsafe {
-            gl::ClearColor(0./255., 0./255., 20./255., 1.0);
+            gl::ClearColor(0./255., 0./255., 0./255., 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
 
             // gl::Uniform1f(u_time.id, start.elapsed().as_secs_f32());
@@ -136,10 +144,13 @@ fn main() -> Result <(), String> {
             gl::UniformMatrix4fv(u_view_matrix.id, 1, gl::FALSE, &view_matrix.columns(0, 4)[0]);
             gl::UniformMatrix4fv(u_proj_matrix.id, 1, gl::FALSE, &proj_matrix.columns(0, 4)[0]);
 
-            // (vertices, indices) = triangle_fan(5);
             vbo.set(&vertices);
-            vao.set();
+            n_vao.enable(0);
             ibo.set(&vec_u32_from_vec_u16(indices.clone()));
+
+            n_vbo.set(&vertices);
+            n_vao.enable(1);
+            n_ibo.set(&vec_u32_from_vec_u16(indices.clone()));
 
             gl::DrawElements(
                 gl::TRIANGLES,
@@ -157,12 +168,22 @@ fn main() -> Result <(), String> {
     Ok(())
 }
 
-fn flatten(vertices: Vec<Vertex>) -> Vec<f32> {
+fn flatten_positions(vertices: &Vec<Vertex>) -> Vec<f32> {
     let mut retval = vec![];
     for vertex in vertices {
         retval.push(vertex.position[0]);
         retval.push(vertex.position[1]);
         retval.push(vertex.position[2]);
+    };
+    retval
+}
+
+fn flatten_normals(vertices: &Vec<Vertex>) -> Vec<f32> {
+    let mut retval = vec![];
+    for vertex in vertices {
+        retval.push(vertex.normal[0]);
+        retval.push(vertex.normal[1]);
+        retval.push(vertex.normal[2]);
     };
     retval
 }
@@ -173,29 +194,4 @@ fn vec_u32_from_vec_u16(input: Vec<u16>) -> Vec<u32> {
         retval.push(x as u32);
     }
     retval
-}
-
-fn triangle_fan(n: u32) -> (Vec<f32>, Vec<u32>) {
-    let mut vertices: Vec<f32> = vec![
-        0.0, 0.0, 0.0,
-        0.5, 0.0, 0.0
-    ];
-    let mut indices: Vec<u32> = vec![];
-
-    let mut angle: f32;
-    for m in 1..n {
-        angle = 2. * PI * m as f32 / n as f32;
-        vertices.push(angle.cos() * 0.5);
-        vertices.push(angle.sin() * 0.5);
-        vertices.push(0.0);
-
-        indices.push(0);
-        indices.push(m);
-        indices.push(m+1);
-    }
-    indices.push(0);
-    indices.push(n);
-    indices.push(1);
-
-    (vertices, indices)
 }
