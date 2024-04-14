@@ -13,7 +13,7 @@ void main()
 {
     vec3 MaterialDiffuseColor = vec3(1.0, 1.0, 1.0);
     vec3 LightColor = vec3(1.0, 1.0, 1.0);
-    float LightPower = 1000.0f;
+    float LightPower = 1.0f;
 
     // Normal of the computed fragment, in camera space
 	vec3 n = normalize( Normal_cameraspace );
@@ -24,5 +24,5 @@ void main()
 
     float cosTheta = clamp( dot( n,l ), 0,1 );
 
-    Color = MaterialDiffuseColor * LightColor * LightPower * cosTheta / (distance*distance);
+    Color = vec3(0, 0, 0.0783) + MaterialDiffuseColor * LightColor * LightPower * cosTheta;
 }

@@ -26,7 +26,7 @@ impl Camera {
             &self.lookat,
             &self.up
         );
-        let proj_matrix = nalgebra_glm::perspective(1.0, self.fov, 0.01, 10000.0);
+        let proj_matrix = nalgebra_glm::perspective(1.0, self.fov, 0.01, 9.296e+9);
         (view_matrix, proj_matrix)
     }
 }

@@ -15,8 +15,8 @@ use std::time::Instant;
 use gl::types::GLuint;
 
 fn main() -> Result <(), String> {
-    let mut screen_width: i32 = 600;
-    let mut screen_height: i32 = 600;
+    let screen_width: i32 = 800;
+    let screen_height: i32 = 600;
 
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
@@ -60,7 +60,7 @@ fn main() -> Result <(), String> {
         nalgebra_glm::vec3(0.0, 0.0, 70.0),
         nalgebra_glm::vec3(0.0, 0.0, 0.0),
         nalgebra_glm::vec3(0.0, 0.0, 1.0),
-        0.94, // 50mm focal length
+        0.94, // 50mm focal length (iPhone 13 camera)
     );
 
     let mut running = true;
@@ -81,8 +81,6 @@ fn main() -> Result <(), String> {
                 Event::Window {win_event, ..} => {
                     if let WindowEvent::Resized(new_width, new_height) = win_event {
                         unsafe {
-                            screen_width = new_width;
-                            screen_height = new_height;
                             gl::Viewport(0, 0, new_width, new_height);
                             gl::Uniform2f(u_resolution.id, new_width as f32, new_height as f32);
                         }
@@ -93,27 +91,29 @@ fn main() -> Result <(), String> {
             }
         }
         unsafe {
-            gl::ClearColor(0./255., 5./255., 5./255., 1.0);
+            gl::ClearColor(0./255., 0./255., 20./255., 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
         }
 
+        // Distance units are in earth radii
+        // (x, y) plane is planetary plane, z is up off the plane
         let t = start.elapsed().as_secs_f32();
-        let planet1_pos = nalgebra_glm::vec3(
-            (0.3 * t).cos() * 60.0,
-            (0.3 * t).sin() * 60.0,
+        let year_speed = 0.001;
+        let earth_pos: nalgebra_glm::Vec3 = nalgebra_glm::vec3(
+            (year_speed * t).cos() * 23486.0,
+            (year_speed * t).sin() * 23486.0,
             0.0);
-        let planet2_pos = nalgebra_glm::vec3(
-            (0.02 * t + 3.1415).cos() * 30.0,
-            (0.02 * t + 3.1415).sin() * 30.0,
+        let moon_pos = earth_pos + nalgebra_glm::vec3(
+            (13.0 * year_speed * t).cos() * 60.0,
+            (13.0 * year_speed * t).sin() * 60.0,
             0.0);
-        camera.position = nalgebra_glm::vec3(
-            (t).cos() * 10.0 + planet1_pos.x,
-            (t).sin() * 10.0 + planet1_pos.y,
-            0.0,
-        ); 
-        camera.lookat = planet1_pos;
-        draw_planet(planet1_pos, program.id(), &mesh, &camera);
-        draw_planet(planet2_pos, program.id(), &mesh, &camera);
+        camera.position = earth_pos + nalgebra_glm::vec3( // Put the camera in geostationary orbit
+            (31.0 * 13.0 * year_speed * t).cos() * 6.619,
+            (31.0 * 13.0 * year_speed * t).sin() * 6.619,
+            0.0);
+        camera.lookat = moon_pos; // And look at the moon!
+        draw_planet(earth_pos, program.id(), 1.0, &mesh, &camera);
+        draw_planet(moon_pos, program.id(), 0.27, &mesh, &camera);
 
         window.gl_swap_window();
     }
@@ -123,16 +123,17 @@ fn main() -> Result <(), String> {
     Ok(())
 }
 
+// Given a planet, the shader id, a mesh, and the camera, renders out a 3d planet!
 fn draw_planet(
     planet_pos: nalgebra_glm::Vec3,
     program_id: GLuint,
+    scale: f32,
     mesh: &Mesh,
     camera: &Camera,
 ) {
-    // (x, y) plane is planetary plane
-    // z is up off the plane
     let mut model_matrix = nalgebra_glm::one();
     model_matrix = nalgebra_glm::translate(&model_matrix, &planet_pos);
+    model_matrix = nalgebra_glm::scale(&model_matrix, &nalgebra_glm::vec3(scale, scale, scale));
     let (view_matrix, proj_matrix) = camera.gen_view_proj_matrices();
         
     unsafe {
