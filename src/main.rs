@@ -1,4 +1,5 @@
 use sdl2::event::{Event, WindowEvent};
+use sdl2::keyboard::Scancode;
 use sdl2::video::SwapInterval;
 
 mod objects;
@@ -15,8 +16,8 @@ use std::time::Instant;
 use gl::types::GLuint;
 
 fn main() -> Result<(), String> {
-    let screen_width: i32 = 800;
-    let screen_height: i32 = 600;
+    let mut screen_width: i32 = 800;
+    let mut screen_height: i32 = 600;
 
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
@@ -65,6 +66,10 @@ fn main() -> Result<(), String> {
     let mut running = true;
     let mut event_queue = sdl_context.event_pump().unwrap();
     let start = Instant::now();
+    // User input
+    let mut keys: [bool; 256] = [false; 256];
+    let mut angle: f32 = 2.5;
+    let mut distance: f32 = 6.;
     while running {
         for event in event_queue.poll_iter() {
             match event {
@@ -81,25 +86,51 @@ fn main() -> Result<(), String> {
 
                 Event::Window { win_event, .. } => {
                     if let WindowEvent::Resized(new_width, new_height) = win_event {
-                        unsafe {
-                            gl::Viewport(0, 0, new_width, new_height);
-                            gl::Uniform2f(u_resolution.id, new_width as f32, new_height as f32);
-                        }
+                        screen_width = new_width;
+                        screen_height = new_height;
                     }
                 }
+
+                Event::KeyDown { scancode, .. } => match scancode {
+                    Some(sc) => {
+                        keys[sc as usize] = true;
+                        println!("{}!", sc);
+                    }
+                    None => {}
+                },
+
+                Event::KeyUp { scancode, .. } => match scancode {
+                    Some(sc) => keys[sc as usize] = false,
+                    None => {}
+                },
 
                 _ => {}
             }
         }
         unsafe {
+            gl::Viewport(0, 0, screen_width, screen_height);
+            gl::Uniform2f(u_resolution.id, screen_width as f32, screen_height as f32);
             gl::ClearColor(0. / 255., 0. / 255., 0. / 255., 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+        }
+
+        if keys[Scancode::Left as usize] {
+            angle -= 0.1;
+        }
+        if keys[Scancode::Right as usize] {
+            angle += 0.1;
+        }
+        if keys[Scancode::Up as usize] {
+            distance = (distance - 2.1).max(1.5);
+        }
+        if keys[Scancode::Down as usize] {
+            distance = (distance + 2.1).min(120.0);
         }
 
         // Distance units are in earth radii
         // (x, y) plane is planetary plane, z is up off the plane
         let t = start.elapsed().as_secs_f32();
-        let year_speed = 0.001;
+        let year_speed = 0.07;
         let earth_pos: nalgebra_glm::Vec3 = nalgebra_glm::vec3(
             (year_speed * t).cos() * 23486.0 * 1.5,
             (year_speed * t).sin() * 23486.0 * 1.5,
@@ -109,13 +140,13 @@ fn main() -> Result<(), String> {
             + nalgebra_glm::vec3(
                 (13.0 * year_speed * t).cos() * 60.0,
                 (13.0 * year_speed * t).sin() * 60.0,
-                0.0,
+                (13.0 * year_speed * t).sin() * 5.345,
             );
         camera.position = earth_pos
             + nalgebra_glm::vec3(
                 // Put the camera in geostationary orbit
-                (31.0 * 13.0 * year_speed * t + 2.95).cos() * 6.619,
-                (31.0 * 13.0 * year_speed * t + 2.95).sin() * 6.619,
+                (1.0 * year_speed * t + angle).cos() * distance,
+                (1.0 * year_speed * t + angle).sin() * distance,
                 0.0,
             );
         camera.lookat = earth_pos; // And look at the moon!

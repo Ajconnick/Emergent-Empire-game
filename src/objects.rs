@@ -390,6 +390,7 @@ impl Texture {
                 gl::UNSIGNED_BYTE,
                 img.as_bytes().as_ptr() as *const _,
             );
+            gl::GenerateMipmap(gl::TEXTURE_2D);
         }
         Ok(())
     }

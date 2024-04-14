@@ -14,6 +14,7 @@ out vec3 texCoord;
 out vec3 Position_worldspace;
 out vec3 Normal_cameraspace;
 out vec3 LightDirection_cameraspace;
+out vec3 EyeDirection_cameraspace;
 
 void main()
 {
@@ -31,7 +32,7 @@ void main()
 	Normal_cameraspace = ( u_view_matrix * u_model_matrix * vec4(Normal_modelspace,0)).xyz; // Only correct if ModelMatrix does not scale the model ! Use its inverse transpose if not.
     
     vec3 vertexPosition_cameraspace = ( u_view_matrix * u_model_matrix * vec4(Position, 1)).xyz;
-	vec3 EyeDirection_cameraspace = vec3(0,0,0) - vertexPosition_cameraspace;
+	EyeDirection_cameraspace = vec3(0,0,0) - vertexPosition_cameraspace;
 
     vec3 LightPosition_cameraspace = ( u_view_matrix * vec4(u_sun_pos_vec3,1)).xyz;
 	LightDirection_cameraspace = LightPosition_cameraspace + EyeDirection_cameraspace;

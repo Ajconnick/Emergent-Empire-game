@@ -30,7 +30,7 @@ pub struct Mesh {
 
 impl Mesh {
     pub fn new(program: u32) -> Self {
-        let input = include_bytes!("../res/ico-sphere.obj");
+        let input = include_bytes!("../res/uv-sphere.obj");
         let obj: Obj<TexturedVertex> = load_obj(&input[..]).unwrap();
         let vb: Vec<TexturedVertex> = obj.vertices;
 
