@@ -164,7 +164,7 @@ impl Vbo {
         self.data(data);
     }
 
-    fn bind(&self) {
+    pub fn bind(&self) {
         unsafe {
             gl::BindBuffer(gl::ARRAY_BUFFER, self.id);
         }

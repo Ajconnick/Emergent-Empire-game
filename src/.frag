@@ -11,9 +11,9 @@ uniform vec3 u_sun_pos_vec3;
 
 void main()
 {
-    vec3 MaterialDiffuseColor = vec3(0.1, 0.1, 1.0);
+    vec3 MaterialDiffuseColor = vec3(1.0, 1.0, 1.0);
     vec3 LightColor = vec3(1.0, 1.0, 1.0);
-    float LightPower = 50.0f;
+    float LightPower = 1000.0f;
 
     // Normal of the computed fragment, in camera space
 	vec3 n = normalize( Normal_cameraspace );
