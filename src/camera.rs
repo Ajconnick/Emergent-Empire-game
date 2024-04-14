@@ -13,19 +13,15 @@ impl Camera {
         fov: f32,
     ) -> Self {
         Camera {
-            position, 
-            lookat, 
+            position,
+            lookat,
             up,
-            fov
+            fov,
         }
     }
 
     pub fn gen_view_proj_matrices(&self) -> (nalgebra_glm::Mat4, nalgebra_glm::Mat4) {
-        let view_matrix = nalgebra_glm::look_at(
-            &self.position,
-            &self.lookat,
-            &self.up
-        );
+        let view_matrix = nalgebra_glm::look_at(&self.position, &self.lookat, &self.up);
         let proj_matrix = nalgebra_glm::perspective(1.0, self.fov, 0.01, 9.296e+9);
         (view_matrix, proj_matrix)
     }

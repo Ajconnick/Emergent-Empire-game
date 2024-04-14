@@ -70,7 +70,7 @@ fn flatten_positions(vertices: &Vec<Vertex>) -> Vec<f32> {
         retval.push(vertex.position[0]);
         retval.push(vertex.position[1]);
         retval.push(vertex.position[2]);
-    };
+    }
     retval
 }
 
@@ -80,7 +80,7 @@ fn flatten_normals(vertices: &Vec<Vertex>) -> Vec<f32> {
         retval.push(vertex.normal[0]);
         retval.push(vertex.normal[1]);
         retval.push(vertex.normal[2]);
-    };
+    }
     retval
 }
 

@@ -25,20 +25,25 @@ impl Shader {
         }
 
         let mut success: GLint = 1;
-        unsafe { gl::GetShaderiv(id, gl::COMPILE_STATUS, &mut success); }
+        unsafe {
+            gl::GetShaderiv(id, gl::COMPILE_STATUS, &mut success);
+        }
 
-        if success == 0 { // Error occured!
+        if success == 0 {
+            // Error occured!
             let mut len: GLint = 0;
             unsafe { gl::GetShaderiv(id, gl::INFO_LOG_LENGTH, &mut len) }
 
             let error = create_whitespace_cstring_with_len(len as usize);
 
-            unsafe{ gl::GetShaderInfoLog(id, len, null_mut(), error.as_ptr() as *mut GLchar); }
+            unsafe {
+                gl::GetShaderInfoLog(id, len, null_mut(), error.as_ptr() as *mut GLchar);
+            }
 
-            return Err(error.to_string_lossy().into_owned())
+            return Err(error.to_string_lossy().into_owned());
         }
 
-        Ok(Shader{id})
+        Ok(Shader { id })
     }
 
     pub fn id(&self) -> GLuint {
@@ -124,7 +129,7 @@ impl Drop for Program {
 fn create_whitespace_cstring_with_len(len: usize) -> CString {
     let mut buffer: Vec<u8> = Vec::with_capacity(len + 1);
     buffer.extend([b' '].iter().cycle().take(len));
-    unsafe {CString::from_vec_unchecked(buffer)}
+    unsafe { CString::from_vec_unchecked(buffer) }
 }
 
 pub fn create_program() -> Result<Program, &'static str> {
@@ -335,5 +340,29 @@ impl Uniform {
             return Err("Couldn't get a uniform location");
         }
         Ok(Uniform { id: location })
+    }
+}
+
+pub struct Texture {
+    pub id: GLuint,
+}
+
+impl Texture {
+    pub fn new() -> Self {
+        let mut id: GLuint = 0;
+        unsafe { gl::GenTextures(1, &mut id) }
+        Self { id }
+    }
+
+    pub fn bind(&self) {
+        unsafe { gl::BindTexture(gl::TEXTURE_2D, self.id) }
+    }
+}
+
+impl Drop for Texture {
+    fn drop(&mut self) {
+        unsafe {
+            gl::DeleteTextures(1, [self.id].as_ptr());
+        }
     }
 }

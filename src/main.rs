@@ -14,7 +14,7 @@ use std::time::Instant;
 
 use gl::types::GLuint;
 
-fn main() -> Result <(), String> {
+fn main() -> Result<(), String> {
     let screen_width: i32 = 800;
     let screen_height: i32 = 600;
 
@@ -34,9 +34,8 @@ fn main() -> Result <(), String> {
 
     let _gl_context = window.gl_create_context().unwrap();
 
-    let _gl = gl::load_with(|s| {
-        video_subsystem.gl_get_proc_address(s) as *const std::os::raw::c_void
-    });
+    let _gl =
+        gl::load_with(|s| video_subsystem.gl_get_proc_address(s) as *const std::os::raw::c_void);
 
     window
         .subsystem()
@@ -60,7 +59,7 @@ fn main() -> Result <(), String> {
         nalgebra_glm::vec3(0.0, 0.0, 70.0),
         nalgebra_glm::vec3(0.0, 0.0, 0.0),
         nalgebra_glm::vec3(0.0, 0.0, 1.0),
-        0.94, // 50mm focal length (iPhone 13 camera)
+        0.094, // 50mm focal length (iPhone 13 camera)
     );
 
     let mut running = true;
@@ -69,16 +68,18 @@ fn main() -> Result <(), String> {
     while running {
         for event in event_queue.poll_iter() {
             match event {
-                Event::Quit {..} => {
+                Event::Quit { .. } => {
                     running = false;
                 }
 
-                Event::MouseMotion {x, y, xrel, yrel, ..} => {
+                Event::MouseMotion {
+                    x, y, xrel, yrel, ..
+                } => {
                     println!("Mouse x: {}, y: {}", x, y);
                     println!("Relative x: {}, y: {}", xrel, yrel);
-                },
+                }
 
-                Event::Window {win_event, ..} => {
+                Event::Window { win_event, .. } => {
                     if let WindowEvent::Resized(new_width, new_height) = win_event {
                         unsafe {
                             gl::Viewport(0, 0, new_width, new_height);
@@ -87,30 +88,36 @@ fn main() -> Result <(), String> {
                     }
                 }
 
-                _ => {},
+                _ => {}
             }
         }
         unsafe {
-            gl::ClearColor(0./255., 0./255., 20./255., 1.0);
+            gl::ClearColor(0. / 255., 0. / 255., 20. / 255., 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
         }
 
         // Distance units are in earth radii
         // (x, y) plane is planetary plane, z is up off the plane
         let t = start.elapsed().as_secs_f32();
-        let year_speed = 0.001;
+        let year_speed = 0.01;
         let earth_pos: nalgebra_glm::Vec3 = nalgebra_glm::vec3(
-            (year_speed * t).cos() * 23486.0,
-            (year_speed * t).sin() * 23486.0,
-            0.0);
-        let moon_pos = earth_pos + nalgebra_glm::vec3(
-            (13.0 * year_speed * t).cos() * 60.0,
-            (13.0 * year_speed * t).sin() * 60.0,
-            0.0);
-        camera.position = earth_pos + nalgebra_glm::vec3( // Put the camera in geostationary orbit
-            (31.0 * 13.0 * year_speed * t).cos() * 6.619,
-            (31.0 * 13.0 * year_speed * t).sin() * 6.619,
-            0.0);
+            (year_speed * t).cos() * 23486.0 * 1.5,
+            (year_speed * t).sin() * 23486.0 * 1.5,
+            0.0,
+        );
+        let moon_pos = earth_pos
+            + nalgebra_glm::vec3(
+                (13.0 * year_speed * t).cos() * 60.0,
+                (13.0 * year_speed * t).sin() * 60.0,
+                0.0,
+            );
+        camera.position = earth_pos
+            + nalgebra_glm::vec3(
+                // Put the camera in geostationary orbit
+                (31.0 * 13.0 * year_speed * t + 2.95).cos() * 6.619,
+                (31.0 * 13.0 * year_speed * t + 2.95).sin() * 6.619,
+                0.0,
+            );
         camera.lookat = moon_pos; // And look at the moon!
         draw_planet(earth_pos, program.id(), 1.0, &mesh, &camera);
         draw_planet(moon_pos, program.id(), 0.27, &mesh, &camera);
@@ -135,16 +142,31 @@ fn draw_planet(
     model_matrix = nalgebra_glm::translate(&model_matrix, &planet_pos);
     model_matrix = nalgebra_glm::scale(&model_matrix, &nalgebra_glm::vec3(scale, scale, scale));
     let (view_matrix, proj_matrix) = camera.gen_view_proj_matrices();
-        
+
     unsafe {
         // These Uniforms allow us to pass data (ex: window size, elapsed time) to the GPU shaders
         let u_model_matrix = Uniform::new(program_id, "u_model_matrix").unwrap();
         let u_view_matrix = Uniform::new(program_id, "u_view_matrix").unwrap();
         let u_proj_matrix = Uniform::new(program_id, "u_proj_matrix").unwrap();
         let u_sun_pos = Uniform::new(program_id, "u_sun_pos_vec3").unwrap();
-        gl::UniformMatrix4fv(u_model_matrix.id, 1, gl::FALSE, &model_matrix.columns(0, 4)[0]);
-        gl::UniformMatrix4fv(u_view_matrix.id, 1, gl::FALSE, &view_matrix.columns(0, 4)[0]);
-        gl::UniformMatrix4fv(u_proj_matrix.id, 1, gl::FALSE, &proj_matrix.columns(0, 4)[0]);
+        gl::UniformMatrix4fv(
+            u_model_matrix.id,
+            1,
+            gl::FALSE,
+            &model_matrix.columns(0, 4)[0],
+        );
+        gl::UniformMatrix4fv(
+            u_view_matrix.id,
+            1,
+            gl::FALSE,
+            &view_matrix.columns(0, 4)[0],
+        );
+        gl::UniformMatrix4fv(
+            u_proj_matrix.id,
+            1,
+            gl::FALSE,
+            &proj_matrix.columns(0, 4)[0],
+        );
         gl::Uniform3f(u_sun_pos.id, 0., 0., 0.);
 
         mesh.set();
