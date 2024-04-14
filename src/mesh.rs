@@ -29,7 +29,7 @@ pub struct Mesh {
 }
 
 impl Mesh {
-    pub fn new(program: u32) -> Self {
+    pub fn new(program: u32, texture_filename: &str) -> Self {
         let input = include_bytes!("../res/uv-sphere.obj");
         let obj: Obj<TexturedVertex> = load_obj(&input[..]).unwrap();
         let vb: Vec<TexturedVertex> = obj.vertices;
@@ -59,7 +59,7 @@ impl Mesh {
         t_vao.set(2);
 
         let texture = Texture::new();
-        texture.load(&Path::new("res/texture.png")).unwrap();
+        texture.load(&Path::new(texture_filename)).unwrap();
         let uniform = CString::new("texture0").unwrap();
         unsafe { gl::Uniform1i(gl::GetUniformLocation(program, uniform.as_ptr()), 0) };
 
