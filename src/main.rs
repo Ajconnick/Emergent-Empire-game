@@ -7,6 +7,9 @@ use objects::*;
 mod mesh;
 use mesh::*;
 
+mod camera;
+use camera::*;
+
 use std::time::Instant;
 
 use gl::types::GLuint;
@@ -53,6 +56,12 @@ fn main() -> Result <(), String> {
     unsafe { gl::Uniform2f(u_resolution.id, screen_width as f32, screen_height as f32) }
 
     let mesh = Mesh::new();
+    let mut camera = Camera::new(
+        nalgebra_glm::vec3(0.0, 0.0, 70.0),
+        nalgebra_glm::vec3(0.0, 0.0, 0.0),
+        nalgebra_glm::vec3(0.0, 0.0, 1.0),
+        0.94, // 50mm focal length
+    );
 
     let mut running = true;
     let mut event_queue = sdl_context.event_pump().unwrap();
@@ -88,18 +97,23 @@ fn main() -> Result <(), String> {
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
         }
 
-        let speed = 1.0;
         let t = start.elapsed().as_secs_f32();
         let planet1_pos = nalgebra_glm::vec3(
-            (speed * t).cos() * 30.0,
-            (speed * t).sin() * 30.0,
+            (0.3 * t).cos() * 60.0,
+            (0.3 * t).sin() * 60.0,
             0.0);
         let planet2_pos = nalgebra_glm::vec3(
-            (speed * (t + 3.1415)).cos() * 30.0,
-            (speed * (t + 3.1415)).sin() * 30.0,
+            (0.02 * t + 3.1415).cos() * 30.0,
+            (0.02 * t + 3.1415).sin() * 30.0,
             0.0);
-        draw_planet(planet1_pos, program.id(), &mesh);
-        draw_planet(planet2_pos, program.id(), &mesh);
+        camera.position = nalgebra_glm::vec3(
+            (t).cos() * 10.0 + planet1_pos.x,
+            (t).sin() * 10.0 + planet1_pos.y,
+            0.0,
+        ); 
+        camera.lookat = planet1_pos;
+        draw_planet(planet1_pos, program.id(), &mesh, &camera);
+        draw_planet(planet2_pos, program.id(), &mesh, &camera);
 
         window.gl_swap_window();
     }
@@ -113,17 +127,13 @@ fn draw_planet(
     planet_pos: nalgebra_glm::Vec3,
     program_id: GLuint,
     mesh: &Mesh,
+    camera: &Camera,
 ) {
     // (x, y) plane is planetary plane
     // z is up off the plane
     let mut model_matrix = nalgebra_glm::one();
     model_matrix = nalgebra_glm::translate(&model_matrix, &planet_pos);
-    let view_matrix = nalgebra_glm::look_at(
-        &nalgebra_glm::vec3(0.0, 0.0,  70.0), 
-        &nalgebra_glm::vec3(0.0, 0.0,  0.0), 
-        &nalgebra_glm::vec3(0.0,  1.0,  0.0)
-    );
-    let proj_matrix = nalgebra_glm::perspective(1.0, 1.0, 0.01, 10000.0);
+    let (view_matrix, proj_matrix) = camera.gen_view_proj_matrices();
         
     unsafe {
         // These Uniforms allow us to pass data (ex: window size, elapsed time) to the GPU shaders
