@@ -2,6 +2,7 @@
 
 layout (location = 0) in vec3 Position;
 layout (location = 1) in vec3 Normal_modelspace;
+layout (location = 2) in vec3 texture_coord;
 
 uniform vec2 u_resolution;
 uniform mat4 u_model_matrix;
@@ -9,6 +10,7 @@ uniform mat4 u_view_matrix;
 uniform mat4 u_proj_matrix;
 uniform vec3 u_sun_pos_vec3;
 
+out vec3 texCoord;
 out vec3 Position_worldspace;
 out vec3 Normal_cameraspace;
 out vec3 LightDirection_cameraspace;
@@ -35,4 +37,5 @@ void main()
 	LightDirection_cameraspace = LightPosition_cameraspace + EyeDirection_cameraspace;
 
     gl_Position = uv;
+    texCoord = texture_coord;
 }

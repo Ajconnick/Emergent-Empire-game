@@ -54,12 +54,12 @@ fn main() -> Result<(), String> {
     let u_resolution = Uniform::new(program.id(), "u_resolution").unwrap();
     unsafe { gl::Uniform2f(u_resolution.id, screen_width as f32, screen_height as f32) }
 
-    let mesh = Mesh::new();
+    let mesh = Mesh::new(program.id());
     let mut camera = Camera::new(
         nalgebra_glm::vec3(0.0, 0.0, 70.0),
         nalgebra_glm::vec3(0.0, 0.0, 0.0),
         nalgebra_glm::vec3(0.0, 0.0, 1.0),
-        0.094, // 50mm focal length (iPhone 13 camera)
+        0.94, // 50mm focal length (iPhone 13 camera)
     );
 
     let mut running = true;
@@ -92,14 +92,14 @@ fn main() -> Result<(), String> {
             }
         }
         unsafe {
-            gl::ClearColor(0. / 255., 0. / 255., 20. / 255., 1.0);
+            gl::ClearColor(0. / 255., 0. / 255., 0. / 255., 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
         }
 
         // Distance units are in earth radii
         // (x, y) plane is planetary plane, z is up off the plane
         let t = start.elapsed().as_secs_f32();
-        let year_speed = 0.01;
+        let year_speed = 0.001;
         let earth_pos: nalgebra_glm::Vec3 = nalgebra_glm::vec3(
             (year_speed * t).cos() * 23486.0 * 1.5,
             (year_speed * t).sin() * 23486.0 * 1.5,
@@ -118,7 +118,7 @@ fn main() -> Result<(), String> {
                 (31.0 * 13.0 * year_speed * t + 2.95).sin() * 6.619,
                 0.0,
             );
-        camera.lookat = moon_pos; // And look at the moon!
+        camera.lookat = earth_pos; // And look at the moon!
         draw_planet(earth_pos, program.id(), 1.0, &mesh, &camera);
         draw_planet(moon_pos, program.id(), 0.27, &mesh, &camera);
 

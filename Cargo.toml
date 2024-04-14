@@ -10,3 +10,4 @@ gl = "*"
 sdl2 = { version = "*", features = ["bundled"] }
 nalgebra-glm = "*"
 obj-rs = "*"
+image = "0.25.1"
