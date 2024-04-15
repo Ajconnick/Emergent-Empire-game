@@ -1,1 +1,1 @@
-# space-game
+# Emergent Empire - game
