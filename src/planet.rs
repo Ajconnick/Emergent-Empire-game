@@ -1,6 +1,8 @@
 use gl::types::GLuint;
 
-use crate::{mesh::*, Camera, Uniform};
+use crate::camera::*;
+use crate::mesh::*;
+use crate::objects::*;
 
 pub const YEAR_SPEED: f32 = 0.07;
 
