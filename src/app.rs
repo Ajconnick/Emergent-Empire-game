@@ -1,7 +1,7 @@
+use std::cell::RefCell;
 use std::time::Instant;
 
 use sdl2::event::{Event, WindowEvent};
-use sdl2::keyboard::Scancode;
 use sdl2::sys::{SDL_GetPerformanceCounter, SDL_GetPerformanceFrequency};
 use sdl2::video::{SwapInterval, Window};
 use sdl2::Sdl;
@@ -16,12 +16,13 @@ pub struct App {
     program_id: u32,
     running: bool,
     keys: [bool; 256],
+    scene_stack: Vec<RefCell<Box<dyn Scene>>>,
 }
 
 impl App {
     pub fn new() -> Result<Self, String> {
-        let mut screen_width: i32 = 800;
-        let mut screen_height: i32 = 600;
+        let screen_width: i32 = 800;
+        let screen_height: i32 = 600;
 
         let sdl_context = sdl2::init()?;
         let video_subsystem = sdl_context.video()?;
@@ -62,6 +63,7 @@ impl App {
             program_id: program.id(),
             running: false,
             keys: [false; 256],
+            scene_stack: vec![],
         })
     }
 
@@ -86,7 +88,7 @@ impl App {
             while lag >= DELTA_T {
                 self.poll_input();
 
-                // scene.update()
+                self.scene_stack.last().unwrap().borrow_mut().update(&self);
 
                 if !scene_stale {
                     // if scene isn't stale, purge the scene
@@ -97,7 +99,7 @@ impl App {
             }
 
             if !scene_stale {
-                // scene.render()
+                self.scene_stack.last().unwrap().borrow_mut().render(&self);
                 self.window.gl_swap_window();
             }
 
@@ -148,4 +150,15 @@ impl App {
             }
         }
     }
+
+    pub fn add_scene(&mut self, scene: RefCell<Box<dyn Scene>>) {
+        self.scene_stack.push(scene);
+    }
+}
+
+pub trait Scene {
+    // TODO: I'm thinking, instead of giving it access to the whole app, we pass in a separate "state" struct
+    //       The scene will modify that struct, and either return it, or have it as an out parameter, for the app to update later.
+    fn update(&mut self, app: &App);
+    fn render(&mut self, app: &App);
 }
