@@ -137,12 +137,12 @@ fn create_whitespace_cstring_with_len(len: usize) -> CString {
 
 pub fn create_program() -> Result<Program, &'static str> {
     let vert_shader = Shader::from_source(
-        &CString::new(include_str!(".vert")).unwrap(),
+        &CString::new(include_str!("../.vert")).unwrap(), // TODO: Load this at runtime
         gl::VERTEX_SHADER,
     )
     .unwrap();
     let frag_shader = Shader::from_source(
-        &CString::new(include_str!(".frag")).unwrap(),
+        &CString::new(include_str!("../.frag")).unwrap(), // TODO: Load this at runtime
         gl::FRAGMENT_SHADER,
     )
     .unwrap();

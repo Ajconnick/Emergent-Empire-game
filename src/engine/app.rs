@@ -6,16 +6,27 @@ use sdl2::sys::{SDL_GetPerformanceCounter, SDL_GetPerformanceFrequency};
 use sdl2::video::{SwapInterval, Window};
 use sdl2::Sdl;
 
-use crate::objects::*;
+use super::objects::{create_program, Uniform};
 
 pub struct App {
-    screen_width: i32,
-    screen_height: i32,
-    sdl_context: Sdl,
-    window: Window,
-    program_id: u32,
-    running: bool,
-    keys: [bool; 256],
+    // Screen stuff
+    pub screen_width: i32,
+    pub screen_height: i32,
+    pub sdl_context: Sdl,
+    pub window: Window,
+
+    // OpenGL stuff
+    pub program_id: u32,
+    u_resolution: Uniform,
+
+    // Main loop stuff
+    pub running: bool,
+    pub seconds: f32, //< How many seconds the program has been up
+
+    // User input state
+    pub keys: [bool; 256],
+
+    // Scene stack stuff
     scene_stack: Vec<RefCell<Box<dyn Scene>>>,
 }
 
@@ -49,6 +60,12 @@ impl App {
             .gl_set_swap_interval(SwapInterval::VSync)
             .unwrap();
 
+        unsafe {
+            gl::Enable(gl::DEPTH_TEST);
+            gl::DepthFunc(gl::LESS);
+            gl::Enable(gl::CULL_FACE);
+        }
+
         let program = create_program().unwrap();
         program.set();
 
@@ -61,7 +78,9 @@ impl App {
             sdl_context,
             window,
             program_id: program.id(),
+            u_resolution,
             running: false,
+            seconds: 0.0,
             keys: [false; 256],
             scene_stack: vec![],
         })
@@ -78,6 +97,7 @@ impl App {
         const DELTA_T: u128 = 16;
 
         while self.running {
+            self.seconds = time.elapsed().as_secs_f32();
             current = time.elapsed().as_millis();
             elapsed = current - previous;
 
@@ -88,7 +108,9 @@ impl App {
             while lag >= DELTA_T {
                 self.poll_input();
 
-                self.scene_stack.last().unwrap().borrow_mut().update(&self);
+                if let Some(scene_ref) = self.scene_stack.last() {
+                    scene_ref.borrow_mut().update(&self);
+                }
 
                 if !scene_stale {
                     // if scene isn't stale, purge the scene
@@ -99,7 +121,20 @@ impl App {
             }
 
             if !scene_stale {
-                self.scene_stack.last().unwrap().borrow_mut().render(&self);
+                unsafe {
+                    gl::Viewport(0, 0, self.screen_width, self.screen_height);
+                    gl::Uniform2f(
+                        self.u_resolution.id,
+                        self.screen_width as f32,
+                        self.screen_height as f32,
+                    );
+                    gl::ClearColor(20. / 255., 20. / 255., 250. / 255., 1.0);
+                    gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+                }
+
+                if let Some(scene_ref) = self.scene_stack.last() {
+                    scene_ref.borrow_mut().render(&self);
+                }
                 self.window.gl_swap_window();
             }
 
@@ -107,7 +142,7 @@ impl App {
             let freq = unsafe { SDL_GetPerformanceFrequency() };
             let seconds = (end as f64 - (start as f64)) / (freq as f64);
             if seconds > 5.0 {
-                println!("Tick!");
+                println!("5 seconds");
                 start = end as u128;
             }
         }
@@ -157,8 +192,7 @@ impl App {
 }
 
 pub trait Scene {
-    // TODO: I'm thinking, instead of giving it access to the whole app, we pass in a separate "state" struct
-    //       The scene will modify that struct, and either return it, or have it as an out parameter, for the app to update later.
+    // TODO: Return a "command" enum so that scene's can affect App state
     fn update(&mut self, app: &App);
     fn render(&mut self, app: &App);
 }

@@ -1,8 +1,6 @@
 use gl::types::GLuint;
 
-use crate::camera::*;
-use crate::mesh::*;
-use crate::objects::*;
+use crate::engine::{camera::Camera, mesh::Mesh, objects::Uniform};
 
 pub const YEAR_SPEED: f32 = 0.07;
 
@@ -23,7 +21,7 @@ impl Planet {
         texture_filename: &str,
         atmosphere_color: nalgebra_glm::Vec3,
     ) -> Self {
-        let mesh = Mesh::new(program, texture_filename);
+        let mesh = Mesh::new(texture_filename, program);
         Planet {
             body_radius,
             orbital_radius,
@@ -84,7 +82,7 @@ impl Planet {
                 self.atmosphere_color.z,
             );
 
-            self.mesh.set();
+            self.mesh.set(program_id);
 
             gl::DrawElements(
                 gl::TRIANGLES,
@@ -92,6 +90,7 @@ impl Planet {
                 gl::UNSIGNED_INT,
                 0 as *const _,
             );
+            println!("Hello!")
         }
     }
 

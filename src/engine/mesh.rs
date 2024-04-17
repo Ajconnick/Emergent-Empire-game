@@ -1,4 +1,4 @@
-use crate::objects::*;
+use super::objects::*;
 
 use std::ffi::CString;
 use std::path::Path;
@@ -24,13 +24,12 @@ pub struct Mesh {
     vertices: Vec<f32>,
     normals: Vec<f32>,
     uv: Vec<f32>,
-
-    program: u32,
+    // program: u32,
 }
 
 impl Mesh {
-    pub fn new(program: u32, texture_filename: &str) -> Self {
-        let input = include_bytes!("../res/uv-sphere.obj");
+    pub fn new(texture_filename: &str, program: u32) -> Self {
+        let input = include_bytes!("../../res/uv-sphere.obj"); // TODO: Load this at runtime
         let obj: Obj<TexturedVertex> = load_obj(&input[..]).unwrap();
         let vb: Vec<TexturedVertex> = obj.vertices;
 
@@ -61,7 +60,7 @@ impl Mesh {
         let texture = Texture::new();
         texture.load(&Path::new(texture_filename)).unwrap();
         let uniform = CString::new("texture0").unwrap();
-        unsafe { gl::Uniform1i(gl::GetUniformLocation(program, uniform.as_ptr()), 0) };
+        unsafe { gl::Uniform1i(gl::GetUniformLocation(program, uniform.as_ptr()), 0) }; // TODO: Is this needed?
 
         Mesh {
             v_ibo,
@@ -78,14 +77,14 @@ impl Mesh {
             vertices,
             normals,
             uv,
-            program,
+            // program,
         }
     }
 
-    pub fn set(&self) {
+    pub fn set(&self, program: u32) {
         self.texture.activate(gl::TEXTURE0);
         let uniform = CString::new("texture0").unwrap();
-        unsafe { gl::Uniform1i(gl::GetUniformLocation(self.program, uniform.as_ptr()), 0) };
+        unsafe { gl::Uniform1i(gl::GetUniformLocation(program, uniform.as_ptr()), 0) };
 
         self.v_vbo.set(&self.vertices);
         self.v_vao.enable(0);

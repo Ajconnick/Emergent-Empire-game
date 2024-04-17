@@ -1,34 +1,16 @@
-use std::{cell::RefCell, rc::Rc};
+use engine::app::App;
 
-use app::{App, Scene};
-
-mod app;
-mod camera;
-mod mesh;
-mod objects;
-mod planet;
-mod world;
+mod components;
+mod engine;
+mod scenes;
 
 fn main() -> Result<(), String> {
     println!("Setting up app...");
     let mut app = App::new()?;
 
-    app.add_scene(RefCell::new(Box::new(TestScene { i: 4 })));
+    // let match_scene = Match::new(app.program_id);
+    // app.add_scene(RefCell::new(Box::new(match_scene)));
     app.run();
 
     Ok(())
-}
-
-struct TestScene {
-    i: i32,
-}
-
-impl Scene for TestScene {
-    fn update(&mut self, app: &App) {
-        println!("Updated!\n");
-    }
-
-    fn render(&mut self, app: &App) {
-        println!("Rendered!\n");
-    }
 }

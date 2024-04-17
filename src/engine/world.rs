@@ -6,20 +6,20 @@ use std::{
 // Still TODO:
 // - Add iterators
 
-struct World {
+pub(crate) struct World {
     entities_count: usize,
     component_vecs: Vec<Box<dyn ComponentVec>>,
 }
 
 impl World {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             entities_count: 0,
             component_vecs: Vec::new(),
         }
     }
 
-    fn new_entity(&mut self) -> usize {
+    pub fn new_entity(&mut self) -> usize {
         let entity_id = self.entities_count;
         for component_vec in self.component_vecs.iter_mut() {
             component_vec.push_none();
@@ -28,7 +28,7 @@ impl World {
         entity_id
     }
 
-    fn add_component_to_entity<ComponentType: 'static>(
+    pub fn add_component_to_entity<ComponentType: 'static>(
         &mut self,
         entity: usize,
         component: ComponentType,
@@ -60,7 +60,7 @@ impl World {
             .push(Box::new(RefCell::new(new_component_vec)));
     }
 
-    fn borrow_component_vec<ComponentType: 'static>(
+    pub fn borrow_component_vec<ComponentType: 'static>(
         &self,
     ) -> Option<RefMut<Vec<Option<ComponentType>>>> {
         for component_vec in self.component_vecs.iter() {
