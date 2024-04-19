@@ -2,7 +2,7 @@ use gl::types::GLuint;
 
 use crate::engine::{camera::Camera, mesh::Mesh, objects::Uniform};
 
-pub const YEAR_SPEED: f32 = 0.07;
+pub const YEAR_SPEED: f32 = 7.;
 
 pub struct Planet {
     pub body_radius: f32,
@@ -15,13 +15,13 @@ pub struct Planet {
 
 impl Planet {
     pub fn new(
-        program: u32,
+        program_id: u32,
         body_radius: f32,
         orbital_radius: f32,
         texture_filename: &str,
         atmosphere_color: nalgebra_glm::Vec3,
     ) -> Self {
-        let mesh = Mesh::new(texture_filename, program);
+        let mesh = Mesh::new(texture_filename, program_id);
         Planet {
             body_radius,
             orbital_radius,
@@ -51,36 +51,36 @@ impl Planet {
 
         unsafe {
             // These Uniforms allow us to pass data (ex: window size, elapsed time) to the GPU shaders
-            let u_model_matrix = Uniform::new(program_id, "u_model_matrix").unwrap();
-            let u_view_matrix = Uniform::new(program_id, "u_view_matrix").unwrap();
-            let u_proj_matrix = Uniform::new(program_id, "u_proj_matrix").unwrap();
-            let u_sun_pos = Uniform::new(program_id, "u_sun_dir_vec3").unwrap();
-            let u_atmos_color = Uniform::new(program_id, "u_atmos_color").unwrap();
-            gl::UniformMatrix4fv(
-                u_model_matrix.id,
-                1,
-                gl::FALSE,
-                &model_matrix.columns(0, 4)[0],
-            );
-            gl::UniformMatrix4fv(
-                u_view_matrix.id,
-                1,
-                gl::FALSE,
-                &view_matrix.columns(0, 4)[0],
-            );
-            gl::UniformMatrix4fv(
-                u_proj_matrix.id,
-                1,
-                gl::FALSE,
-                &proj_matrix.columns(0, 4)[0],
-            );
-            gl::Uniform3f(u_sun_pos.id, 0., 0., 0.);
-            gl::Uniform3f(
-                u_atmos_color.id,
-                self.atmosphere_color.x,
-                self.atmosphere_color.y,
-                self.atmosphere_color.z,
-            );
+            // let u_model_matrix = Uniform::new(program_id, "u_model_matrix").unwrap();
+            // let u_view_matrix = Uniform::new(program_id, "u_view_matrix").unwrap();
+            // let u_proj_matrix = Uniform::new(program_id, "u_proj_matrix").unwrap();
+            // let u_sun_pos = Uniform::new(program_id, "u_sun_dir_vec3").unwrap();
+            // let u_atmos_color = Uniform::new(program_id, "u_atmos_color").unwrap();
+            // gl::UniformMatrix4fv(
+            //     u_model_matrix.id,
+            //     1,
+            //     gl::FALSE,
+            //     &model_matrix.columns(0, 4)[0],
+            // );
+            // gl::UniformMatrix4fv(
+            //     u_view_matrix.id,
+            //     1,
+            //     gl::FALSE,
+            //     &view_matrix.columns(0, 4)[0],
+            // );
+            // gl::UniformMatrix4fv(
+            //     u_proj_matrix.id,
+            //     1,
+            //     gl::FALSE,
+            //     &proj_matrix.columns(0, 4)[0],
+            // );
+            // gl::Uniform3f(u_sun_pos.id, 0., 0., 0.);
+            // gl::Uniform3f(
+            //     u_atmos_color.id,
+            //     self.atmosphere_color.x,
+            //     self.atmosphere_color.y,
+            //     self.atmosphere_color.z,
+            // );
 
             self.mesh.set(program_id);
 
@@ -90,11 +90,6 @@ impl Planet {
                 gl::UNSIGNED_INT,
                 0 as *const _,
             );
-            println!("Hello!")
         }
-    }
-
-    pub fn pos(&self) -> nalgebra_glm::Vec3 {
-        nalgebra_glm::vec3(self.position.x, self.position.y, self.position.z)
     }
 }

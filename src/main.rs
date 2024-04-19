@@ -1,16 +1,12 @@
-use engine::app::App;
-
 mod components;
 mod engine;
 mod scenes;
 
+use std::cell::RefCell;
+
+use engine::app::*;
+use scenes::r#match::Match;
+
 fn main() -> Result<(), String> {
-    println!("Setting up app...");
-    let mut app = App::new()?;
-
-    // let match_scene = Match::new(app.program_id);
-    // app.add_scene(RefCell::new(Box::new(match_scene)));
-    app.run();
-
-    Ok(())
+    run(&|app| RefCell::new(Box::new(Match::new(app.program_id))))
 }
