@@ -29,10 +29,12 @@ pub struct App {
     scene_stack: Vec<RefCell<Box<dyn Scene>>>,
 }
 
-pub fn run(init: &dyn Fn(&App) -> RefCell<Box<dyn Scene>>) -> Result<(), String> {
-    let screen_width: i32 = 800;
-    let screen_height: i32 = 600;
-
+pub fn run(
+    screen_width: i32,
+    screen_height: i32,
+    window_title: &'static str,
+    init: &dyn Fn(&App) -> RefCell<Box<dyn Scene>>,
+) -> Result<(), String> {
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
 
@@ -41,7 +43,7 @@ pub fn run(init: &dyn Fn(&App) -> RefCell<Box<dyn Scene>>) -> Result<(), String>
     gl_attr.set_context_version(3, 3);
 
     let window = video_subsystem
-        .window("Window!", screen_width as u32, screen_height as u32)
+        .window(window_title, screen_width as u32, screen_height as u32)
         .resizable()
         .opengl()
         .build()

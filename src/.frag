@@ -12,6 +12,7 @@ uniform float u_time;
 uniform vec3 u_sun_dir_vec3;
 uniform sampler2D texture0;
 uniform vec3 u_atmos_color;
+uniform vec3 u_emissive_color;
 
 void main()
 {
@@ -35,8 +36,10 @@ void main()
     Color =
         // Ambient light
         MaterialDiffuseColor * vec3(0.1, 0.1, 0.1)
+        // Emissive color - ie for the Sun
+        + u_emissive_color
         // Diffuse light
         + MaterialDiffuseColor * LightColor * LightPower * cosTheta
         // Atmosphere
-        + atmosphere * LightColor * LightPower * cosTheta2 * u_atmos_color ;
+        + atmosphere * LightColor * LightPower * cosTheta2 * u_atmos_color;
 }

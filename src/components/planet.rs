@@ -2,13 +2,14 @@ use gl::types::GLuint;
 
 use crate::engine::{camera::Camera, mesh::Mesh, objects::Uniform};
 
-pub const YEAR_SPEED: f32 = 0.07;
+pub const YEAR_SPEED: f32 = 7.0;
 
 pub struct Planet {
     pub body_radius: f32,
     orbital_radius: f32,
     mesh: Mesh,
     atmosphere_color: nalgebra_glm::Vec3,
+    emissive_color: nalgebra_glm::Vec3,
 
     pub position: nalgebra_glm::Vec3,
 }
@@ -20,6 +21,7 @@ impl Planet {
         orbital_radius: f32,
         texture_filename: &str,
         atmosphere_color: nalgebra_glm::Vec3,
+        emissive_color: nalgebra_glm::Vec3,
     ) -> Self {
         let mesh = Mesh::new(texture_filename, program_id);
         Planet {
@@ -27,14 +29,15 @@ impl Planet {
             orbital_radius,
             mesh,
             atmosphere_color,
+            emissive_color,
             position: nalgebra_glm::vec3(0., 0., 0.),
         }
     }
 
     pub fn update(&mut self, t: f32) {
         self.position = nalgebra_glm::vec3(
-            (YEAR_SPEED * t / self.body_radius).cos() * self.orbital_radius,
-            (YEAR_SPEED * t / self.body_radius).sin() * self.orbital_radius,
+            (YEAR_SPEED * t / self.orbital_radius).cos() * self.orbital_radius,
+            (YEAR_SPEED * t / self.orbital_radius).sin() * self.orbital_radius,
             0.0,
         );
     }
@@ -56,6 +59,7 @@ impl Planet {
             let u_proj_matrix = Uniform::new(program_id, "u_proj_matrix").unwrap();
             let u_sun_pos = Uniform::new(program_id, "u_sun_dir_vec3").unwrap();
             let u_atmos_color = Uniform::new(program_id, "u_atmos_color").unwrap();
+            let u_emissive_color = Uniform::new(program_id, "u_emissive_color").unwrap();
             gl::UniformMatrix4fv(
                 u_model_matrix.id,
                 1,
@@ -80,6 +84,12 @@ impl Planet {
                 self.atmosphere_color.x,
                 self.atmosphere_color.y,
                 self.atmosphere_color.z,
+            );
+            gl::Uniform3f(
+                u_emissive_color.id,
+                self.emissive_color.x,
+                self.emissive_color.y,
+                self.emissive_color.z,
             );
 
             self.mesh.set(program_id);

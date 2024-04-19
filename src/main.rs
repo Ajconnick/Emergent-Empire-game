@@ -8,5 +8,7 @@ use engine::app::*;
 use scenes::r#match::Match;
 
 fn main() -> Result<(), String> {
-    run(&|app| RefCell::new(Box::new(Match::new(app.program_id))))
+    run(800, 600, "Emergent Empire", &|app| {
+        RefCell::new(Box::new(Match::new(app.program_id)))
+    })
 }
