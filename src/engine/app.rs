@@ -6,9 +6,6 @@ use sdl2::sys::{SDL_GetPerformanceCounter, SDL_GetPerformanceFrequency};
 use sdl2::video::SwapInterval;
 use sdl2::Sdl;
 
-use crate::components::planet::Planet;
-use crate::engine::camera::Camera;
-
 use super::objects::{create_program, Uniform};
 
 pub struct App {
@@ -68,8 +65,8 @@ pub fn run(init: &dyn Fn(&App) -> RefCell<Box<dyn Scene>>) -> Result<(), String>
 
     let program = create_program().unwrap();
     program.set();
-    // let u_resolution = Uniform::new(program.id(), "u_resolution").unwrap();
-    // unsafe { gl::Uniform2f(u_resolution.id, screen_width as f32, screen_height as f32) }
+    let u_resolution = Uniform::new(program.id(), "u_resolution").unwrap();
+    unsafe { gl::Uniform2f(u_resolution.id, screen_width as f32, screen_height as f32) }
 
     let mut app = App {
         screen_width,
@@ -82,49 +79,6 @@ pub fn run(init: &dyn Fn(&App) -> RefCell<Box<dyn Scene>>) -> Result<(), String>
         seconds: 0.0,
         scene_stack: Vec::new(),
     };
-
-    let merucry = Planet::new(
-        program.id(),
-        0.38,
-        90.910,
-        "res/mercury.png",
-        nalgebra_glm::vec3(0., 0., 0.),
-    );
-    let venus = Planet::new(
-        program.id(),
-        0.9499,
-        169.878,
-        "res/venus.png",
-        nalgebra_glm::vec3(1., 0.9, 0.7),
-    );
-    let earth = Planet::new(
-        program.id(),
-        1.,
-        234.866,
-        "res/earth.png",
-        nalgebra_glm::vec3(0.8, 0.9, 1.),
-    );
-    let mars = Planet::new(
-        program.id(),
-        0.533,
-        352.198,
-        "res/mars.png",
-        nalgebra_glm::vec3(1., 0.45, 0.25),
-    );
-    let jupiter = Planet::new(
-        program.id(),
-        10.973,
-        1222.14,
-        "res/jupiter.png",
-        nalgebra_glm::vec3(1.5, 1.3, 0.88),
-    );
-    let mut planets = vec![merucry, venus, earth, mars, jupiter];
-    let mut camera = Camera::new(
-        nalgebra_glm::vec3(0.0, 0.0, 00.0),
-        planets[1].position,
-        nalgebra_glm::vec3(0.0, 0.0, 1.0),
-        0.94, // 50mm focal length (iPhone 13 camera)
-    );
 
     let initial_scene = init(&app);
     app.scene_stack.push(initial_scene);
@@ -162,24 +116,19 @@ pub fn run(init: &dyn Fn(&App) -> RefCell<Box<dyn Scene>>) -> Result<(), String>
 
         if !scene_stale {
             unsafe {
-                // gl::Viewport(0, 0, app.screen_width, app.screen_height);
-                // gl::Uniform2f(
-                //     app.u_resolution.id,
-                //     app.screen_width as f32,
-                //     app.screen_height as f32,
-                // );
-                gl::ClearColor(0. / 255., 0. / 255., 20. / 255., 1.0);
+                gl::Viewport(0, 0, app.screen_width, app.screen_height);
+                gl::Uniform2f(
+                    u_resolution.id,
+                    app.screen_width as f32,
+                    app.screen_height as f32,
+                );
+                gl::ClearColor(0. / 255., 0. / 255., 5. / 255., 1.0);
                 gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
             }
             if let Some(scene_ref) = app.scene_stack.last() {
                 scene_ref.borrow_mut().render(&app);
             }
             window.gl_swap_window();
-        }
-
-        // Draw planets
-        for planet in &planets {
-            planet.draw(program.id(), &camera);
         }
 
         let end = unsafe { SDL_GetPerformanceCounter() };
