@@ -26,6 +26,7 @@ pub struct Match {
 
 impl Scene for Match {
     fn update(&mut self, app: &App) {
+        self.control(app);
         self.planet_system(app);
         self.camera_update(app);
     }
@@ -178,6 +179,29 @@ impl Match {
         }
     }
 
+    fn control(&mut self, app: &App) {
+        let curr_enter_state = app.keys[Scancode::Return as usize];
+        if curr_enter_state && !self.prev_enter_state {
+            self.selection += 1;
+            if self.selection >= self.number_planets {
+                self.selection = 0;
+            }
+        }
+        self.prev_enter_state = curr_enter_state;
+
+        let control_speed = 0.005;
+        let zoom_control_speed = 0.15 * (self.distance - self.selected_body_radius);
+        if app.mouse_left_down {
+            self.phi -= control_speed * (app.mouse_rel_x as f32);
+            self.theta = (self.theta - control_speed * (app.mouse_rel_y as f32))
+                .max(control_speed - PI / 2.0)
+                .min(PI / 2.0 - control_speed);
+        }
+        self.distance = (self.distance - zoom_control_speed * (app.mouse_wheel as f32))
+            .max(self.selected_body_radius * 1.5)
+            .min(self.selected_body_radius * 1.5 + 234.0);
+    }
+
     /// Goes through each planet and updates it's position
     fn planet_system(&mut self, app: &App) {
         let mut planets = self.world.borrow_component_vec::<Planet>().unwrap();
@@ -196,43 +220,19 @@ impl Match {
         }
     }
 
-    fn camera_update(&mut self, app: &App) {
-        let curr_enter_state = app.keys[Scancode::Return as usize];
-        if curr_enter_state && !self.prev_enter_state {
-            self.selection += 1;
-            self.selected_body_radius *= 10000000.0;
-            if self.selection >= self.number_planets {
-                self.selection = 0;
-            }
-        }
-        self.prev_enter_state = curr_enter_state;
-
-        let control_speed = 0.005;
-        let zoom_control_speed = 0.5 * self.selected_body_radius;
-        if app.mouse_left_down {
-            self.phi -= control_speed * (app.mouse_rel_x as f32);
-            self.theta = (self.theta - control_speed * (app.mouse_rel_y as f32))
-                .max(control_speed - PI / 2.0)
-                .min(PI / 2.0 - control_speed);
-        }
-        self.distance = (self.distance - zoom_control_speed * (app.mouse_wheel as f32))
-            .max(self.selected_body_radius + 1.0)
-            .min(self.selected_body_radius * 10.0);
-
+    fn camera_update(&mut self, _app: &App) {
         let rot_matrix = nalgebra_glm::rotate_y(
             &nalgebra_glm::rotate_z(&nalgebra_glm::one(), self.phi),
             self.theta,
         );
-        self.camera.position =
-            self.selected_pos + (rot_matrix * nalgebra_glm::vec4(self.distance, 0., 0., 0.)).xyz();
-        self.camera.lookat = self.selected_pos; // And look at it!
+        self.camera.position = (rot_matrix * nalgebra_glm::vec4(self.distance, 0., 0., 0.)).xyz();
     }
 
     fn planet_render_system(&mut self, app: &App) {
         let mut planets = self.world.borrow_component_vec::<Planet>().unwrap();
         let iter = planets.iter_mut().filter_map(|p| Some(p.as_mut()?));
         for planet in iter {
-            planet.draw(app.program_id, &self.camera);
+            planet.draw(app.program_id, &self.camera, self.selected_pos);
         }
     }
 }

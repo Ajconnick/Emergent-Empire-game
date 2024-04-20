@@ -35,7 +35,7 @@ impl Planet {
         atmosphere_color: nalgebra_glm::Vec3,
         emissive_color: nalgebra_glm::Vec3,
     ) -> Self {
-        let mesh_data = if gaseous { UV_DATA } else { ICO_DATA };
+        let mesh_data = if gaseous { UV_DATA } else { UV_DATA };
         let mesh = Mesh::new(mesh_data, texture_filename);
         Planet {
             body_radius,
@@ -65,9 +65,10 @@ impl Planet {
     }
 
     // Given a planet, the shader id, a mesh, and the camera, renders out a 3d planet!
-    pub fn draw(&self, program_id: GLuint, camera: &Camera) {
+    pub fn draw(&self, program_id: GLuint, camera: &Camera, selected_offset: nalgebra_glm::Vec3) {
+        let subtracted = self.position - selected_offset;
         let mut model_matrix = nalgebra_glm::one();
-        model_matrix = nalgebra_glm::translate(&model_matrix, &self.position);
+        model_matrix = nalgebra_glm::translate(&model_matrix, &subtracted);
         model_matrix = nalgebra_glm::rotate_y(&model_matrix, self.tilt);
         model_matrix = nalgebra_glm::rotate_z(&model_matrix, self.rotation);
         model_matrix = nalgebra_glm::scale(
@@ -102,7 +103,12 @@ impl Planet {
                 gl::FALSE,
                 &proj_matrix.columns(0, 4)[0],
             );
-            gl::Uniform3f(u_sun_pos.id, 0., 0., 0.);
+            gl::Uniform3f(
+                u_sun_pos.id,
+                -selected_offset.x,
+                -selected_offset.y,
+                -selected_offset.z,
+            );
             gl::Uniform3f(
                 u_atmos_color.id,
                 self.atmosphere_color.x,
