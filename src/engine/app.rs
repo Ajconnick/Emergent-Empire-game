@@ -70,6 +70,7 @@ pub fn run(
         gl::Enable(gl::DEPTH_TEST);
         gl::DepthFunc(gl::LESS);
         gl::Enable(gl::CULL_FACE);
+        gl::Enable(gl::MULTISAMPLE);
     }
 
     let program = create_program().unwrap();

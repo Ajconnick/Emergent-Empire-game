@@ -5,6 +5,7 @@ in vec3 Position_worldspace;
 in vec3 Normal_cameraspace;
 in vec3 LightDirection_cameraspace;
 in vec3 EyeDirection_cameraspace;
+in vec3 fill;
 
 out vec3 Color;
 
@@ -29,7 +30,7 @@ void main()
 	// Distance to the light
 	float distance = length( u_sun_dir_vec3 - Position_worldspace );
 
-    float cosTheta = clamp( dot( n,l ), 0,1 );
+    float cosTheta = clamp(dot( n,l ), 0, 1);
     float cosTheta2 = clamp( 0.5 * dot( n,l ) + 0.2, 0,1 );
     float a = dot(n, e);
     float atmosphere = clamp(pow(a-1,4), 0, 1);

@@ -4,7 +4,8 @@ use gl::types::GLuint;
 
 use crate::engine::{camera::Camera, mesh::Mesh, objects::Uniform};
 
-pub const YEAR_SPEED: f32 = 2.0 * PI / 219000.0; // One full earth year in 300 seconds (5 minutes)
+pub const YEAR_SPEED: f32 = 2.0 * PI / 600.0; // One full earth year in 300 seconds (5 minutes)
+pub const T_SEED: f32 = 25000.0; // An offset from t, so that the planets are not all in a line.
 
 pub const ICO_DATA: &[u8] = include_bytes!("../../res/ico-sphere.obj");
 pub const UV_DATA: &[u8] = include_bytes!("../../res/uv-sphere.obj");
@@ -54,26 +55,38 @@ impl Planet {
     pub fn update(&mut self, t: f32) {
         if self.orbital_time_years > 0.0 {
             self.position = nalgebra_glm::vec3(
-                (YEAR_SPEED * t / self.orbital_time_years).cos() * self.orbital_radius,
-                (YEAR_SPEED * t / self.orbital_time_years).sin() * self.orbital_radius,
+                (YEAR_SPEED * (t + T_SEED) / self.orbital_time_years).cos() * self.orbital_radius,
+                (YEAR_SPEED * (t + T_SEED) / self.orbital_time_years).sin() * self.orbital_radius,
                 0.0,
             );
         }
         if self.day_time_years > 0.0 {
-            self.rotation = YEAR_SPEED * t / self.day_time_years;
+            self.rotation = YEAR_SPEED * (t + T_SEED) / self.day_time_years;
         }
     }
 
-    // Given a planet, the shader id, a mesh, and the camera, renders out a 3d planet!
-    pub fn draw(&self, program_id: GLuint, camera: &Camera, selected_offset: nalgebra_glm::Vec3) {
+    /// Given a planet, the shader id, a mesh, and the camera, renders out a 3d planet!
+    pub fn draw(
+        &self,
+        min_length: f32,
+        program_id: GLuint,
+        camera: &Camera,
+        selected_offset: nalgebra_glm::Vec3,
+    ) {
         let subtracted = self.position - selected_offset;
+        let distance = nalgebra_glm::length(&subtracted);
+        let scale_factor = 1.0 / min_length;
         let mut model_matrix = nalgebra_glm::one();
         model_matrix = nalgebra_glm::translate(&model_matrix, &subtracted);
         model_matrix = nalgebra_glm::rotate_y(&model_matrix, self.tilt);
         model_matrix = nalgebra_glm::rotate_z(&model_matrix, self.rotation);
         model_matrix = nalgebra_glm::scale(
             &model_matrix,
-            &nalgebra_glm::vec3(self.body_radius, self.body_radius, self.body_radius),
+            &nalgebra_glm::vec3(
+                self.body_radius + scale_factor * distance,
+                self.body_radius + scale_factor * distance,
+                self.body_radius + scale_factor * distance,
+            ),
         );
         let (view_matrix, proj_matrix) = camera.gen_view_proj_matrices();
 

@@ -183,6 +183,7 @@ impl Match {
         let curr_enter_state = app.keys[Scancode::Return as usize];
         if curr_enter_state && !self.prev_enter_state {
             self.selection += 1;
+            self.selected_body_radius = 0.0;
             if self.selection >= self.number_planets {
                 self.selection = 0;
             }
@@ -198,8 +199,8 @@ impl Match {
                 .min(PI / 2.0 - control_speed);
         }
         self.distance = (self.distance - zoom_control_speed * (app.mouse_wheel as f32))
-            .max(self.selected_body_radius * 1.5)
-            .min(self.selected_body_radius * 1.5 + 234.0);
+            .max(self.selected_body_radius * 3.0)
+            .min(self.selected_body_radius * 3.0 + 234.0);
     }
 
     /// Goes through each planet and updates it's position
@@ -232,7 +233,12 @@ impl Match {
         let mut planets = self.world.borrow_component_vec::<Planet>().unwrap();
         let iter = planets.iter_mut().filter_map(|p| Some(p.as_mut()?));
         for planet in iter {
-            planet.draw(app.program_id, &self.camera, self.selected_pos);
+            planet.draw(
+                (app.screen_height as f32).min(app.screen_width as f32),
+                app.program_id,
+                &self.camera,
+                self.selected_pos,
+            );
         }
     }
 }
