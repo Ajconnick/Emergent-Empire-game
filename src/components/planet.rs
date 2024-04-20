@@ -1,51 +1,75 @@
+use std::f32::consts::PI;
+
 use gl::types::GLuint;
 
 use crate::engine::{camera::Camera, mesh::Mesh, objects::Uniform};
 
-pub const YEAR_SPEED: f32 = 7.0;
+pub const YEAR_SPEED: f32 = 2.0 * PI / 219000.0; // One full earth year in 300 seconds (5 minutes)
+
+pub const ICO_DATA: &[u8] = include_bytes!("../../res/ico-sphere.obj");
+pub const UV_DATA: &[u8] = include_bytes!("../../res/uv-sphere.obj");
 
 pub struct Planet {
     pub body_radius: f32,
     orbital_radius: f32,
+    tilt: f32,
+    orbital_time_years: f32,
+    day_time_years: f32,
     mesh: Mesh,
     atmosphere_color: nalgebra_glm::Vec3,
     emissive_color: nalgebra_glm::Vec3,
 
     pub position: nalgebra_glm::Vec3,
+    rotation: f32,
 }
 
 impl Planet {
     pub fn new(
-        program_id: u32,
+        gaseous: bool,
         body_radius: f32,
         orbital_radius: f32,
+        tilt: f32,
+        orbital_time_years: f32,
+        day_time_years: f32,
         texture_filename: &str,
         atmosphere_color: nalgebra_glm::Vec3,
         emissive_color: nalgebra_glm::Vec3,
     ) -> Self {
-        let mesh = Mesh::new(texture_filename, program_id);
+        let mesh_data = if gaseous { UV_DATA } else { ICO_DATA };
+        let mesh = Mesh::new(mesh_data, texture_filename);
         Planet {
             body_radius,
             orbital_radius,
+            tilt,
+            orbital_time_years,
+            day_time_years,
             mesh,
             atmosphere_color,
             emissive_color,
             position: nalgebra_glm::vec3(0., 0., 0.),
+            rotation: 0.0,
         }
     }
 
     pub fn update(&mut self, t: f32) {
-        self.position = nalgebra_glm::vec3(
-            (YEAR_SPEED * t / self.orbital_radius).cos() * self.orbital_radius,
-            (YEAR_SPEED * t / self.orbital_radius).sin() * self.orbital_radius,
-            0.0,
-        );
+        if self.orbital_time_years > 0.0 {
+            self.position = nalgebra_glm::vec3(
+                (YEAR_SPEED * t / self.orbital_time_years).cos() * self.orbital_radius,
+                (YEAR_SPEED * t / self.orbital_time_years).sin() * self.orbital_radius,
+                0.0,
+            );
+        }
+        if self.day_time_years > 0.0 {
+            self.rotation = YEAR_SPEED * t / self.day_time_years;
+        }
     }
 
     // Given a planet, the shader id, a mesh, and the camera, renders out a 3d planet!
     pub fn draw(&self, program_id: GLuint, camera: &Camera) {
         let mut model_matrix = nalgebra_glm::one();
         model_matrix = nalgebra_glm::translate(&model_matrix, &self.position);
+        model_matrix = nalgebra_glm::rotate_y(&model_matrix, self.tilt);
+        model_matrix = nalgebra_glm::rotate_z(&model_matrix, self.rotation);
         model_matrix = nalgebra_glm::scale(
             &model_matrix,
             &nalgebra_glm::vec3(self.body_radius, self.body_radius, self.body_radius),

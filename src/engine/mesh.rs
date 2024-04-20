@@ -26,9 +26,8 @@ pub struct Mesh {
 }
 
 impl Mesh {
-    pub fn new(texture_filename: &str, program_id: u32) -> Self {
-        let input = include_bytes!("../../res/ico-sphere.obj"); // TODO: Load this at runtime
-        let obj: Obj<TexturedVertex> = load_obj(&input[..]).unwrap();
+    pub fn new(mesh_data: &[u8], texture_filename: &str) -> Self {
+        let obj: Obj<TexturedVertex> = load_obj(&mesh_data[..]).unwrap();
         let vb: Vec<TexturedVertex> = obj.vertices;
 
         let indices = obj.indices;
@@ -57,8 +56,6 @@ impl Mesh {
 
         let texture = Texture::new();
         texture.load(&Path::new(texture_filename)).unwrap();
-        let uniform = CString::new("texture0").unwrap();
-        unsafe { gl::Uniform1i(gl::GetUniformLocation(program_id, uniform.as_ptr()), 0) }; // TODO: Is this needed?
 
         Mesh {
             v_ibo,

@@ -24,6 +24,13 @@ pub struct App {
 
     // User input state
     pub keys: [bool; 256],
+    pub mouse_x: i32,
+    pub mouse_y: i32,
+    pub mouse_rel_x: i32,
+    pub mouse_rel_y: i32,
+    pub mouse_left_down: bool,
+    pub mouse_right_down: bool,
+    pub mouse_wheel: f32,
 
     // Scene stack stuff
     scene_stack: Vec<RefCell<Box<dyn Scene>>>,
@@ -78,6 +85,13 @@ pub fn run(
         // u_resolution,
         running: true,
         keys: [false; 256],
+        mouse_x: 0,
+        mouse_y: 0,
+        mouse_rel_x: 0,
+        mouse_rel_y: 0,
+        mouse_left_down: false,
+        mouse_right_down: false,
+        mouse_wheel: 0.0,
         seconds: 0.0,
         scene_stack: Vec::new(),
     };
@@ -102,6 +116,7 @@ pub fn run(
 
         let scene_stale = false;
         while lag >= DELTA_T {
+            app.reset_input();
             app.poll_input();
 
             if let Some(scene_ref) = app.scene_stack.last() {
@@ -124,7 +139,7 @@ pub fn run(
                     app.screen_width as f32,
                     app.screen_height as f32,
                 );
-                gl::ClearColor(0. / 255., 0. / 255., 5. / 255., 1.0);
+                gl::ClearColor(0. / 255., 0. / 255., 0. / 255., 1.0);
                 gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
             }
             if let Some(scene_ref) = app.scene_stack.last() {
@@ -145,6 +160,12 @@ pub fn run(
 }
 
 impl App {
+    fn reset_input(&mut self) {
+        self.mouse_rel_x = 0;
+        self.mouse_rel_y = 0;
+        self.mouse_wheel = 0.0;
+    }
+
     fn poll_input(&mut self) {
         let mut event_queue = self.sdl_context.event_pump().unwrap();
         for event in event_queue.poll_iter() {
@@ -156,7 +177,26 @@ impl App {
                 Event::MouseMotion {
                     x, y, xrel, yrel, ..
                 } => {
-                    _ = (x, y, xrel, yrel);
+                    self.mouse_x = x;
+                    self.mouse_y = y;
+                    self.mouse_rel_x = xrel;
+                    self.mouse_rel_y = yrel;
+                }
+
+                Event::MouseButtonDown { mouse_btn, .. } => match mouse_btn {
+                    sdl2::mouse::MouseButton::Left => self.mouse_left_down = true,
+                    sdl2::mouse::MouseButton::Right => self.mouse_right_down = true,
+                    _ => {}
+                },
+
+                Event::MouseButtonUp { mouse_btn, .. } => match mouse_btn {
+                    sdl2::mouse::MouseButton::Left => self.mouse_left_down = false,
+                    sdl2::mouse::MouseButton::Right => self.mouse_right_down = false,
+                    _ => {}
+                },
+
+                Event::MouseWheel { precise_y, .. } => {
+                    self.mouse_wheel = precise_y;
                 }
 
                 Event::Window { win_event, .. } => {

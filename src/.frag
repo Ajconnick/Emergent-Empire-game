@@ -16,7 +16,8 @@ uniform vec3 u_emissive_color;
 
 void main()
 {
-    vec3 MaterialDiffuseColor = texture(texture0, texCoord.xy).xyz;
+    vec2 idx = vec2(int(texCoord.x * 24.0) / 24.0, int(texCoord.y * 24.0) / 24.0);
+    vec3 MaterialDiffuseColor = texture(texture0, idx).xyz;
     vec3 LightColor = vec3(1.0, 1.0, 1.0);
     float LightPower = 1.0;
 
@@ -33,13 +34,11 @@ void main()
     float a = dot(n, e);
     float atmosphere = clamp(pow(a-1,4), 0, 1);
 
-    Color =
-        // Ambient light
-        MaterialDiffuseColor * vec3(0.1, 0.1, 0.1)
+    Color = 
         // Emissive color - ie for the Sun
         + u_emissive_color
         // Diffuse light
-        + MaterialDiffuseColor * LightColor * LightPower * cosTheta
+        + MaterialDiffuseColor * LightColor * LightPower * (cosTheta + 0.0000005 * distance) / max(0.000002 * distance, 1.0)
         // Atmosphere
         + atmosphere * LightColor * LightPower * cosTheta2 * u_atmos_color;
 }
