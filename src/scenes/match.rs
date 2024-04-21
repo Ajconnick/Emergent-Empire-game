@@ -14,7 +14,9 @@ pub struct Match {
 
     selection: u32,
     selected_pos: nalgebra_glm::Vec3,
+    prev_selected_pos: nalgebra_glm::Vec3,
     selected_body_radius: f32,
+    transition: f32,
 
     phi: f32,
     theta: f32,
@@ -27,7 +29,9 @@ pub struct Match {
 impl Scene for Match {
     fn update(&mut self, app: &App) {
         self.control(app);
-        self.planet_system(app);
+        self.planet_system(app, 0);
+        self.planet_system(app, 1);
+        self.planet_system(app, 2);
         self.camera_update(app);
     }
 
@@ -36,13 +40,24 @@ impl Scene for Match {
     }
 }
 
+fn incr_num_planets(num: &mut u32) -> u32 {
+    let tmp = *num;
+    *num += 1;
+    tmp
+}
+
 impl Match {
     pub fn new() -> Self {
         let mut world = World::new();
 
-        let planet_entity = world.new_entity();
+        let mut num_planets: u32 = 0;
+
+        let sun_entity = world.new_entity();
         let planet_component = Planet::new(
             true,
+            incr_num_planets(&mut num_planets),
+            sun_entity,
+            0,
             109.17,
             0.01,
             0.0,
@@ -52,10 +67,14 @@ impl Match {
             nalgebra_glm::vec3(0., 0., 0.),
             nalgebra_glm::vec3(1., 1., 1.),
         );
-        world.add_component_to_entity(planet_entity, planet_component);
+        world.add_component_to_entity(sun_entity, planet_component);
+
         let planet_entity = world.new_entity();
         let planet_component = Planet::new(
             false,
+            incr_num_planets(&mut num_planets),
+            sun_entity,
+            1,
             0.38,
             9084.20,
             0.0005,
@@ -66,9 +85,13 @@ impl Match {
             nalgebra_glm::vec3(0., 0., 0.),
         );
         world.add_component_to_entity(planet_entity, planet_component);
+
         let planet_entity = world.new_entity();
         let planet_component = Planet::new(
             false,
+            incr_num_planets(&mut num_planets),
+            sun_entity,
+            1,
             0.9499,
             16990.86,
             3.096,
@@ -79,9 +102,13 @@ impl Match {
             nalgebra_glm::vec3(0., 0., 0.),
         );
         world.add_component_to_entity(planet_entity, planet_component);
+
         let planet_entity = world.new_entity();
         let planet_component = Planet::new(
             false,
+            incr_num_planets(&mut num_planets),
+            sun_entity,
+            1,
             1.,
             23486.60,
             0.4091,
@@ -92,9 +119,29 @@ impl Match {
             nalgebra_glm::vec3(0., 0., 0.),
         );
         world.add_component_to_entity(planet_entity, planet_component);
+        let moon_entity = world.new_entity();
+        let moon_component = Planet::new(
+            false,
+            incr_num_planets(&mut num_planets),
+            planet_entity,
+            2,
+            0.272,
+            60.34,
+            0.0896,
+            0.0749,
+            0.0749,
+            "res/moon.png",
+            nalgebra_glm::vec3(0.0, 0.0, 0.0),
+            nalgebra_glm::vec3(0., 0., 0.),
+        );
+        world.add_component_to_entity(moon_entity, moon_component);
+
         let planet_entity = world.new_entity();
         let planet_component = Planet::new(
             false,
+            incr_num_planets(&mut num_planets),
+            sun_entity,
+            1,
             0.533,
             35219.80,
             0.4392,
@@ -105,9 +152,13 @@ impl Match {
             nalgebra_glm::vec3(0., 0., 0.),
         );
         world.add_component_to_entity(planet_entity, planet_component);
+
         let planet_entity = world.new_entity();
         let planet_component = Planet::new(
             true,
+            incr_num_planets(&mut num_planets),
+            sun_entity,
+            1,
             10.973,
             122273.60,
             0.0546,
@@ -118,9 +169,77 @@ impl Match {
             nalgebra_glm::vec3(0., 0., 0.),
         );
         world.add_component_to_entity(planet_entity, planet_component);
+        let moon_entity = world.new_entity();
+        let moon_component = Planet::new(
+            false,
+            incr_num_planets(&mut num_planets),
+            planet_entity,
+            2,
+            0.2858,
+            66.17,
+            0.0,
+            0.00484,
+            0.00484,
+            "res/io.png",
+            nalgebra_glm::vec3(0., 0., 0.),
+            nalgebra_glm::vec3(0., 0., 0.),
+        );
+        world.add_component_to_entity(moon_entity, moon_component);
+        let moon_entity = world.new_entity();
+        let moon_component = Planet::new(
+            false,
+            incr_num_planets(&mut num_planets),
+            planet_entity,
+            2,
+            0.245,
+            105.01,
+            0.0,
+            0.00971,
+            0.00971,
+            "res/europa.png",
+            nalgebra_glm::vec3(0., 0., 0.),
+            nalgebra_glm::vec3(0., 0., 0.),
+        );
+        world.add_component_to_entity(moon_entity, moon_component);
+        let moon_entity = world.new_entity();
+        let moon_component = Planet::new(
+            false,
+            incr_num_planets(&mut num_planets),
+            planet_entity,
+            2,
+            0.4125,
+            167.85,
+            0.0,
+            0.01957,
+            0.01957,
+            "res/ganymede.png",
+            nalgebra_glm::vec3(0., 0., 0.),
+            nalgebra_glm::vec3(0., 0., 0.),
+        );
+        world.add_component_to_entity(moon_entity, moon_component);
+        let moon_entity = world.new_entity();
+        let moon_component = Planet::new(
+            false,
+            incr_num_planets(&mut num_planets),
+            planet_entity,
+            2,
+            0.3798,
+            295.39,
+            0.0,
+            0.04565,
+            0.04565,
+            "res/callisto.png",
+            nalgebra_glm::vec3(0., 0., 0.),
+            nalgebra_glm::vec3(0., 0., 0.),
+        );
+        world.add_component_to_entity(moon_entity, moon_component);
+
         let planet_entity = world.new_entity();
         let planet_component = Planet::new(
             true,
+            incr_num_planets(&mut num_planets),
+            sun_entity,
+            1,
             9.14,
             224025.82,
             0.466,
@@ -131,9 +250,29 @@ impl Match {
             nalgebra_glm::vec3(0., 0., 0.),
         );
         world.add_component_to_entity(planet_entity, planet_component);
+        let moon_entity = world.new_entity();
+        let moon_component = Planet::new(
+            false,
+            incr_num_planets(&mut num_planets),
+            planet_entity,
+            2,
+            0.2529,
+            191.70,
+            0.0,
+            0.0436,
+            0.0436,
+            "res/titan.png",
+            nalgebra_glm::vec3(0.82, 0.63, 0.82),
+            nalgebra_glm::vec3(0., 0., 0.),
+        );
+        world.add_component_to_entity(moon_entity, moon_component);
+
         let planet_entity = world.new_entity();
         let planet_component = Planet::new(
             true,
+            incr_num_planets(&mut num_planets),
+            sun_entity,
+            1,
             3.98,
             449310.14,
             1.707,
@@ -144,9 +283,13 @@ impl Match {
             nalgebra_glm::vec3(0., 0., 0.),
         );
         world.add_component_to_entity(planet_entity, planet_component);
+
         let planet_entity = world.new_entity();
         let planet_component = Planet::new(
             true,
+            incr_num_planets(&mut num_planets),
+            sun_entity,
+            1,
             3.86,
             706000.76,
             0.494,
@@ -157,6 +300,22 @@ impl Match {
             nalgebra_glm::vec3(0., 0., 0.),
         );
         world.add_component_to_entity(planet_entity, planet_component);
+        let moon_entity = world.new_entity();
+        let moon_component = Planet::new(
+            false,
+            incr_num_planets(&mut num_planets),
+            planet_entity,
+            2,
+            0.2128,
+            55.75,
+            0.0,
+            -0.01608,
+            -0.01608,
+            "res/triton.png",
+            nalgebra_glm::vec3(0., 0.0, 0.0),
+            nalgebra_glm::vec3(0., 0., 0.),
+        );
+        world.add_component_to_entity(moon_entity, moon_component);
 
         let camera = Camera::new(
             nalgebra_glm::vec3(0.0, 0.0, 0.0),
@@ -168,14 +327,16 @@ impl Match {
         Self {
             world,
             camera,
-            selection: 0,
+            selection: 3,
             selected_pos: nalgebra_glm::vec3(0.0, 0.0, 0.0),
+            prev_selected_pos: nalgebra_glm::vec3(0.0, 0.0, 0.0),
+            transition: 1.0,
             selected_body_radius: 0.0,
             phi: 2.5,
             theta: 0.0,
             distance: 20.0,
             prev_enter_state: false,
-            number_planets: 0,
+            number_planets: num_planets,
         }
     }
 
@@ -184,6 +345,8 @@ impl Match {
         if curr_enter_state && !self.prev_enter_state {
             self.selection += 1;
             self.selected_body_radius = 0.0;
+            self.prev_selected_pos = self.selected_pos;
+            self.transition = app.seconds;
             if self.selection >= self.number_planets {
                 self.selection = 0;
             }
@@ -199,25 +362,37 @@ impl Match {
                 .min(PI / 2.0 - control_speed);
         }
         self.distance = (self.distance - zoom_control_speed * (app.mouse_wheel as f32))
-            .max(self.selected_body_radius * 3.0)
+            .max(self.selected_body_radius * 2.0)
             .min(self.selected_body_radius * 3.0 + 234.0);
     }
 
     /// Goes through each planet and updates it's position
-    fn planet_system(&mut self, app: &App) {
+    fn planet_system(&mut self, app: &App, tier: u32) {
         let mut planets = self.world.borrow_component_vec::<Planet>().unwrap();
-        let iter = planets
-            .iter_mut()
-            .filter_map(|p| Some(p.as_mut()?))
-            .zip(0..);
-        self.number_planets = 0;
-        for (planet, i) in iter {
-            planet.update(app.seconds);
-            if i == self.selection {
+        let planet_pos: Vec<Option<nalgebra_glm::Vec3>> = planets
+            .iter()
+            .map(|p| {
+                if let Some(planet) = p {
+                    Some(planet.position)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let iter = planets.iter_mut().filter_map(|p| {
+            if p.is_some() && p.as_ref().unwrap().tier == tier {
+                Some(p.as_mut()?)
+            } else {
+                None
+            }
+        });
+
+        for planet in iter {
+            planet.update(app.seconds, planet_pos[planet.parent_entity_id].unwrap());
+            if planet.id == self.selection {
                 self.selected_pos = planet.position;
                 self.selected_body_radius = planet.body_radius;
             }
-            self.number_planets += 1;
         }
     }
 
@@ -232,13 +407,20 @@ impl Match {
     fn planet_render_system(&mut self, app: &App) {
         let mut planets = self.world.borrow_component_vec::<Planet>().unwrap();
         let iter = planets.iter_mut().filter_map(|p| Some(p.as_mut()?));
+        let transition = cubic_ease_out((app.seconds - self.transition).min(1.0));
+        let offset = (1.0 - transition) * self.prev_selected_pos + transition * self.selected_pos;
         for planet in iter {
             planet.draw(
                 (app.screen_height as f32).min(app.screen_width as f32),
                 app.program_id,
                 &self.camera,
-                self.selected_pos,
+                offset,
             );
         }
     }
+}
+
+fn cubic_ease_out(t: f32) -> f32 {
+    // Cubic easing out function
+    1.0 - (1.0 - t).powf(30.0)
 }

@@ -19,6 +19,12 @@ void main()
 {
     vec2 idx = vec2(int(texCoord.x * 24.0) / 24.0, int(texCoord.y * 24.0) / 24.0);
     vec3 MaterialDiffuseColor = texture(texture0, idx).xyz;
+
+    if (length(Position_worldspace) >= 10000.0) {
+        Color = MaterialDiffuseColor; // If it's so far away, just shade it all one color
+        return;
+    }
+
     vec3 LightColor = vec3(1.0, 1.0, 1.0);
     float LightPower = 1.0;
 

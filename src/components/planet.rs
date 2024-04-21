@@ -4,13 +4,17 @@ use gl::types::GLuint;
 
 use crate::engine::{camera::Camera, mesh::Mesh, objects::Uniform};
 
-pub const YEAR_SPEED: f32 = 2.0 * PI / 600.0; // One full earth year in 300 seconds (5 minutes)
-pub const T_SEED: f32 = 25000.0; // An offset from t, so that the planets are not all in a line.
+pub const REAL_SECS_PER_GAME_YEAR: f32 = 600.0; // How many real seconds it takes for earth to go around the sun once
+pub const T_SEED: f32 = 98400.0; // An offset from t, so that the planets are not all in a line.
 
 pub const ICO_DATA: &[u8] = include_bytes!("../../res/ico-sphere.obj");
 pub const UV_DATA: &[u8] = include_bytes!("../../res/uv-sphere.obj");
 
 pub struct Planet {
+    pub id: u32,
+    pub parent_entity_id: usize,
+    pub tier: u32,
+
     pub body_radius: f32,
     orbital_radius: f32,
     tilt: f32,
@@ -27,6 +31,9 @@ pub struct Planet {
 impl Planet {
     pub fn new(
         gaseous: bool,
+        id: u32,
+        parent_entity_id: usize,
+        tier: u32,
         body_radius: f32,
         orbital_radius: f32,
         tilt: f32,
@@ -36,9 +43,12 @@ impl Planet {
         atmosphere_color: nalgebra_glm::Vec3,
         emissive_color: nalgebra_glm::Vec3,
     ) -> Self {
-        let mesh_data = if gaseous { UV_DATA } else { UV_DATA };
+        let mesh_data = if gaseous { UV_DATA } else { ICO_DATA };
         let mesh = Mesh::new(mesh_data, texture_filename);
         Planet {
+            id,
+            parent_entity_id,
+            tier,
             body_radius,
             orbital_radius,
             tilt,
@@ -52,16 +62,23 @@ impl Planet {
         }
     }
 
-    pub fn update(&mut self, t: f32) {
-        if self.orbital_time_years > 0.0 {
+    pub fn update(&mut self, t: f32, parent_pos: nalgebra_glm::Vec3) {
+        if self.orbital_time_years != 0.0 {
             self.position = nalgebra_glm::vec3(
-                (YEAR_SPEED * (t + T_SEED) / self.orbital_time_years).cos() * self.orbital_radius,
-                (YEAR_SPEED * (t + T_SEED) / self.orbital_time_years).sin() * self.orbital_radius,
+                (2.0 * PI * (t + T_SEED) / (REAL_SECS_PER_GAME_YEAR * self.orbital_time_years))
+                    .cos()
+                    * self.orbital_radius
+                    + parent_pos.x,
+                (2.0 * PI * (t + T_SEED) / (REAL_SECS_PER_GAME_YEAR * self.orbital_time_years))
+                    .sin()
+                    * self.orbital_radius
+                    + parent_pos.y,
                 0.0,
             );
         }
-        if self.day_time_years > 0.0 {
-            self.rotation = YEAR_SPEED * (t + T_SEED) / self.day_time_years;
+        if self.day_time_years != 0.0 {
+            self.rotation =
+                2.0 * PI * (t + T_SEED) / (REAL_SECS_PER_GAME_YEAR * self.day_time_years) + 3.14;
         }
     }
 
