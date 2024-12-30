@@ -17,6 +17,7 @@ pub struct Planet {
     pub day_time_years: f32,
     pub rotation: f32,
     pub bvh_node_id: BVHNodeId,
+    pub name: &'static str,
 }
 
 impl Planet {
@@ -31,12 +32,10 @@ impl Planet {
         tier: u32,
         body_radius: f32,
         orbital_radius: f32,
-        // tilt: f32,
         orbital_time_years: f32,
         day_time_years: f32,
         texture_id: TextureId,
-        // atmosphere_color: nalgebra_glm::Vec3,
-        // emissive_color: nalgebra_glm::Vec3,
+        name: &'static str,
     ) -> usize {
         let planet_mesh = if gaseous {
             renderer.get_mesh_id_from_name("uv").unwrap()
@@ -70,13 +69,11 @@ impl Planet {
                     tier,
                     body_radius,
                     orbital_radius,
-                    // tilt,
                     orbital_time_years,
                     day_time_years,
-                    // atmosphere_color,
-                    // emissive_color,
                     rotation: 0.0,
                     bvh_node_id,
+                    name,
                 },),
             )
             .unwrap();

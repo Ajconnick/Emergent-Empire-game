@@ -16,6 +16,7 @@ use sdl2::keyboard::Scancode;
 use crate::components::planet::Planet;
 
 /// Object file data, used for meshes
+pub const QUAD_XY_DATA: &[u8] = include_bytes!("../../res/quad-xy.obj");
 pub const ICO_DATA: &[u8] = include_bytes!("../../res/ico-sphere.obj");
 pub const UV_DATA: &[u8] = include_bytes!("../../res/uv-sphere.obj");
 
@@ -60,6 +61,7 @@ impl Scene for Gameplay {
         self.control(app);
         self.planet_system(app, 0);
         self.planet_system(app, 1);
+        self.planet_system(app, 2);
         self.camera_update(app);
     }
 
@@ -77,6 +79,15 @@ impl Scene for Gameplay {
             &self.bvh,
             false,
         );
+
+        for (_entity, planet) in self.world.query::<&Planet>().iter() {
+            if planet.id == self.selection {
+                let font = app.renderer.get_font_id_from_name("font").unwrap();
+                app.renderer.set_font(font);
+                app.renderer
+                    .draw_text(nalgebra_glm::vec2(10.0, 10.0), &planet.name);
+            }
+        }
     }
 }
 
@@ -136,6 +147,8 @@ impl Gameplay {
         );
 
         // Setup the mesh manager
+        app.renderer
+            .add_mesh_from_obj(QUAD_XY_DATA, Some("quad-xy"));
         app.renderer.add_mesh_from_obj(UV_DATA, Some("uv"));
         app.renderer.add_mesh_from_obj(ICO_DATA, Some("ico"));
 
@@ -144,6 +157,8 @@ impl Gameplay {
             .add_texture_from_png("res/sun.png", Some("sun"));
         app.renderer
             .add_texture_from_png("res/earth.png", Some("earth"));
+        app.renderer
+            .add_texture_from_png("res/moon.png", Some("moon"));
 
         // Setup the font manager
         app.renderer
@@ -165,9 +180,10 @@ impl Gameplay {
             0.0,
             0.0,
             app.renderer.get_texture_id_from_name("sun").unwrap(),
+            "Sun",
         );
 
-        let _planet_planet_id = Planet::new(
+        let planet_planet_id = Planet::new(
             &mut world,
             &app.renderer,
             &mut bvh,
@@ -176,10 +192,27 @@ impl Gameplay {
             sun_planet_id,
             1,
             1.,
-            2348.660,
+            23486.0,
             1.0,
             0.0027,
             app.renderer.get_texture_id_from_name("earth").unwrap(),
+            "Earth",
+        );
+
+        let _moon_planet_id = Planet::new(
+            &mut world,
+            &app.renderer,
+            &mut bvh,
+            false,
+            incr_num_planets(&mut num_planets),
+            planet_planet_id,
+            2,
+            0.272,
+            60.34,
+            0.0749,
+            0.0749,
+            app.renderer.get_texture_id_from_name("moon").unwrap(),
+            "Moon",
         );
 
         Self {
@@ -188,7 +221,10 @@ impl Gameplay {
                 nalgebra_glm::vec3(1.0, 0.0, 1.0),
                 nalgebra_glm::vec3(0.0, 0.0, 0.0),
                 nalgebra_glm::vec3(0.0, 0.0, 1.0),
-                ProjectionKind::Perspective { fov: 0.65 },
+                ProjectionKind::Perspective {
+                    fov: 0.65,
+                    far: 10000000.0,
+                },
             ),
             bvh,
             directional_light: DirectionalLightSource::new(
@@ -210,7 +246,7 @@ impl Gameplay {
                 1024,
             ),
 
-            selection: 0,
+            selection: 1,
             selected_pos: nalgebra_glm::vec3(0.0, 0.0, 0.0),
             prev_selected_pos: nalgebra_glm::vec3(0.0, 0.0, 0.0),
             transition: 1.0,
@@ -266,12 +302,12 @@ impl Gameplay {
                 continue;
             }
 
-            const REAL_SECS_PER_GAME_YEAR: f32 = 60.0; // How many real seconds it takes for earth to go around the sun once
+            const REAL_SECS_PER_GAME_YEAR: f32 = 600.0; // How many real seconds it takes for earth to go around the sun once
             const T_SEED: f32 = 98400.0; // An offset from t, so that the planets are not all in a line.
             let t = app.seconds;
             let parent_pos = planet_pos[planet.parent_planet_id];
 
-            if planet.tier != 0 && app.ticks % 100 == 0 {
+            if planet.tier != 0 {
                 let new_pos = nalgebra_glm::vec3(
                     (2.0 * PI * (t + T_SEED)
                         / (REAL_SECS_PER_GAME_YEAR * planet.orbital_time_years))
@@ -314,6 +350,9 @@ impl Gameplay {
         );
         let transition = cubic_ease_out((app.seconds - self.transition).min(1.0));
         let offset = (1.0 - transition) * self.prev_selected_pos + transition * self.selected_pos;
+        // TODO: It's convenient to have planet model space be opengl-model-space, but there's a lot of floating point jitter.
+        //       It also affects lighting and makes it weird, which is why it's turned off for this PR.
+        //       We'll need opengl-model-space be centered at the selected body's position.
         self.camera_3d.set_position(
             (rot_matrix * nalgebra_glm::vec4(self.distance, 0., 0., 0.)).xyz() + offset,
         );
