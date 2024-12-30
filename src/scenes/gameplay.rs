@@ -1,91 +1,70 @@
-use core::f32;
-use std::ops::Deref;
+//! This module is responsible for defining the gameplay scene.
+
+use std::f32::consts::PI;
 
 use apricot::{
     app::{App, Scene},
-    bvh::{BVHNodeId, BVH},
+    bvh::BVH,
     camera::{Camera, ProjectionKind},
-    chunked_map::ChunkedPerlinMap,
-    perlin::HeightMap,
-    ray::Ray,
-    rectangle::Rectangle,
-    render2d::NineSlice,
+    objects::create_program,
     render_core::ModelComponent,
     shadow_map::DirectionalLightSource,
 };
 use hecs::{Entity, World};
-use rand::SeedableRng;
 use sdl2::keyboard::Scancode;
 
-const MAP_WIDTH: usize = 16384; // 16k is desireable!
-const CHUNK_SIZE: usize = 16;
-const UNIT_PER_METER: f32 = 0.05;
-const MINUTES_PER_DAY: f32 = 10.0;
-const TICKS_OFFSET: f32 = 0.0;
+use crate::components::planet::Planet;
 
-pub const QUAD_DATA: &[u8] = include_bytes!("../../res/quad.obj");
-pub const QUAD_XY_DATA: &[u8] = include_bytes!("../../res/quad-xy.obj");
-pub const CUBE_DATA: &[u8] = include_bytes!("../../res/cube.obj");
-pub const CONE_DATA: &[u8] = include_bytes!("../../res/cone.obj");
-pub const BUSH_DATA: &[u8] = include_bytes!("../../res/bush.obj");
+/// Object file data, used for meshes
+pub const ICO_DATA: &[u8] = include_bytes!("../../res/ico-sphere.obj");
+pub const UV_DATA: &[u8] = include_bytes!("../../res/uv-sphere.obj");
 
-struct Player {
-    bvh_node_id: BVHNodeId,
-}
-
-pub struct Rock {}
-
+/// Struct that contains info about the game state
 pub struct Gameplay {
+    /// The world where all the entities live
     world: World,
+    /// The camera used for rendering 3d models
     camera_3d: Camera,
+    /// The sun's light source
     directional_light: DirectionalLightSource,
-    map: ChunkedPerlinMap,
+    /// A bounding-volume hierarchy, a container that stores models and allows for efficient lookup for fast rendering
     bvh: BVH<Entity>,
 
-    // Player stuff
-    position: nalgebra_glm::Vec3,
-    velocity: nalgebra_glm::Vec3,
+    /// Which planetary body is currently selected
+    selection: usize,
+    /// The radius of the currently selected planetary body, for limiting zoom
+    selected_body_radius: f32,
+    /// The position of the selected planetary body, used for swoosh animation
+    selected_pos: nalgebra_glm::Vec3,
+    /// The prev selected position, used for swoosh animation
+    prev_selected_pos: nalgebra_glm::Vec3,
+    /// Animation key frame counter
+    transition: f32,
 
-    prev_space_state: bool,
-    debug: bool,
+    /// Up-down view angle
+    phi: f32,
+    /// Side-side view angle
+    theta: f32,
+    /// How far the camera swivels around the currently selected body
+    distance: f32,
 
-    update_swap: u32,
+    /// Used for enter key latch
+    prev_enter_state: bool,
+    /// How many planets there are
+    number_planets: usize,
 }
 
 impl Scene for Gameplay {
+    /// Update the scene every tick
     fn update(&mut self, app: &App) {
-        self.directional_light.light_dir.z =
-            (app.ticks as f32 / (60.0 * 60.0 * 0.5 * MINUTES_PER_DAY) + TICKS_OFFSET).cos();
-        self.directional_light.light_dir.y =
-            (app.ticks as f32 / (60.0 * 60.0 * 0.5 * MINUTES_PER_DAY) + TICKS_OFFSET).sin();
-        self.map.check_chunks(
-            &app.renderer,
-            self.position.xy(),
-            &mut self.world,
-            &mut self.bvh,
-        );
-        self.update_view(app);
-        self.update_clickers(app);
-        self.update_swap += 1;
+        self.control(app);
+        self.planet_system(app, 0);
+        self.planet_system(app, 1);
+        self.camera_update(app);
     }
 
+    /// Render the scene to the screen when time allows
     fn render(&mut self, app: &App) {
-        // sky system
-        let model_t = app.ticks as f32 / (60.0 * 60.0 * 0.5 * MINUTES_PER_DAY) + TICKS_OFFSET;
-        unsafe {
-            let day_color = nalgebra_glm::vec3(172.0, 205.0, 248.0);
-            let night_color = nalgebra_glm::vec3(5.0, 6.0, 7.0);
-            let red_color = nalgebra_glm::vec3(124.0, 102.0, 86.0);
-            let do_color = if model_t.cos() > 0.0 {
-                day_color
-            } else {
-                night_color
-            };
-            let dnf = model_t.sin().powf(100.0);
-            let result = dnf * red_color + (1.0 - dnf) * do_color;
-            gl::ClearColor(result.x / 255., result.y / 255., result.z / 255., 1.0);
-        }
-
         app.renderer.set_camera(self.camera_3d);
         app.renderer.directional_light_system(
             &mut self.directional_light,
@@ -96,94 +75,75 @@ impl Scene for Gameplay {
             &mut self.world,
             &self.directional_light,
             &self.bvh,
-            self.debug,
+            false,
         );
-        app.renderer
-            .set_color(nalgebra_glm::vec4(1.0, 1.0, 1.0, 0.8));
-        app.renderer
-            .render_3d_outlines_system(&mut self.world, &self.bvh);
-
-        let font = app.renderer.get_font_id_from_name("font").unwrap();
-        app.renderer.set_font(font);
-        app.renderer
-            .draw_text(nalgebra_glm::vec2(10.0, 10.0), "Hunger");
-
-        let nine_slice = NineSlice {
-            texture: app
-                .renderer
-                .get_texture_id_from_name("nine-slice-test")
-                .unwrap(),
-            border: 8.0,
-        };
-        let nine_slice2 = NineSlice {
-            texture: app
-                .renderer
-                .get_texture_id_from_name("nine-slice-test2")
-                .unwrap(),
-            border: 8.0,
-        };
-        app.renderer
-            .render_nine_slice(nine_slice, Rectangle::new(70.0, 10.0, 164.0, 16.0));
-        app.renderer.render_nine_slice(
-            nine_slice2,
-            Rectangle::new(
-                70.0,
-                10.0,
-                (app.ticks as f32 * 0.01).cos().abs() * 100.0 + 16.0,
-                16.0,
-            ),
-        );
-
-        self.render_outline_text(app);
-
-        // Draw the two hand inventory slots
-        const SLOT_SIZE: f32 = 96.0;
-        app.renderer
-            .set_color(nalgebra_glm::vec4(0.0, 0.0, 0.0, 0.5));
-        app.renderer.fill_rect(Rectangle::new(
-            app.window_size.x as f32 * 0.5 - SLOT_SIZE * 1.5,
-            app.window_size.y as f32 - SLOT_SIZE,
-            SLOT_SIZE,
-            SLOT_SIZE,
-        ));
-        app.renderer.fill_rect(Rectangle::new(
-            app.window_size.x as f32 * 0.5 + SLOT_SIZE * 0.5,
-            app.window_size.y as f32 - SLOT_SIZE,
-            SLOT_SIZE,
-            SLOT_SIZE,
-        ));
     }
 }
 
+/// Increments a counter and returns the previous value
+fn incr_num_planets(num: &mut usize) -> usize {
+    let tmp = *num;
+    *num += 1;
+    tmp
+}
+
 impl Gameplay {
+    /// Constructs a new Gameplay struct with everything setup
+    /// TODO: Most of this stuff will need to be moved to the init scene. Remind me to make an issue for this!
     pub fn new(app: &App) -> Self {
         let mut world = World::new();
 
-        let mut rng = rand::rngs::StdRng::from_entropy();
-        let mut map =
-            ChunkedPerlinMap::new(MAP_WIDTH, CHUNK_SIZE, 0.01, rand::Rng::gen(&mut rng), 1.0);
+        // Add programs to the renderer
+        app.renderer.add_program(
+            create_program(
+                include_str!("../shaders/3d.vert"),
+                include_str!("../shaders/3d.frag"),
+            )
+            .unwrap(),
+            Some("3d"),
+        );
+        app.renderer.add_program(
+            create_program(
+                include_str!("../shaders/2d.vert"),
+                include_str!("../shaders/2d.frag"),
+            )
+            .unwrap(),
+            Some("2d"),
+        );
+        app.renderer.add_program(
+            create_program(
+                include_str!("../shaders/shadow.vert"),
+                include_str!("../shaders/shadow.frag"),
+            )
+            .unwrap(),
+            Some("shadow"),
+        );
+        app.renderer.add_program(
+            create_program(
+                include_str!("../shaders/2d.vert"),
+                include_str!("../shaders/solid-color.frag"),
+            )
+            .unwrap(),
+            Some("2d-solid"),
+        );
+        app.renderer.add_program(
+            create_program(
+                include_str!("../shaders/3d.vert"),
+                include_str!("../shaders/solid-color.frag"),
+            )
+            .unwrap(),
+            Some("3d-solid"),
+        );
 
         // Setup the mesh manager
-        let quad_mesh = app.renderer.add_mesh_from_obj(QUAD_DATA, Some("quad"));
-        app.renderer
-            .add_mesh_from_obj(QUAD_XY_DATA, Some("quad-xy"));
-        let cube_mesh = app.renderer.add_mesh_from_obj(CUBE_DATA, Some("cube"));
-        app.renderer.add_mesh_from_obj(CONE_DATA, Some("tree"));
-        app.renderer.add_mesh_from_obj(BUSH_DATA, Some("bush"));
+        app.renderer.add_mesh_from_obj(UV_DATA, Some("uv"));
+        app.renderer.add_mesh_from_obj(ICO_DATA, Some("ico"));
 
         // Setup the texture manager
-        let grass_texture = app
-            .renderer
-            .add_texture_from_png("grass.png", Some("grass"));
-        let water_texture = app
-            .renderer
-            .add_texture_from_png("water.png", Some("water"));
-        app.renderer.add_texture_from_png("tree.png", Some("tree"));
-        app.renderer.add_texture_from_png("rock.png", Some("rock"));
         app.renderer
-            .add_texture_from_png("nine-slice-test.png", Some("nine-slice-test"));
+            .add_texture_from_png("res/sun.png", Some("sun"));
         app.renderer
-            .add_texture_from_png("nine-slice-test2.png", Some("nine-slice-test2"));
+            .add_texture_from_png("res/earth.png", Some("earth"));
 
         // Setup the font manager
         app.renderer
@@ -191,69 +151,50 @@ impl Gameplay {
 
         let mut bvh = BVH::<Entity>::new();
 
-        let spawn_point =
-            nalgebra_glm::vec3(MAP_WIDTH as f32 / 2.0 + 1.0, MAP_WIDTH as f32 / 2.0, 2.5);
-        loop {
-            if map.chunkless_height(spawn_point.xy()) > 0.74 {
-                break;
-            }
-            map = ChunkedPerlinMap::new(MAP_WIDTH, CHUNK_SIZE, 0.01, rand::Rng::gen(&mut rng), 1.0);
-        }
-
-        // Add player
-        let scale_vec = nalgebra_glm::vec3(0.2, 0.2, 1.0);
-        let player_entity = world.spawn((ModelComponent::new(
-            cube_mesh,
-            grass_texture,
-            spawn_point,
-            scale_vec,
-        ),));
-        let player_node_id = bvh.insert(
-            player_entity,
-            app.renderer
-                .get_mesh_aabb(cube_mesh)
-                .scale(scale_vec)
-                .translate(spawn_point),
+        let mut num_planets: usize = 0;
+        let sun_planet_id = Planet::new(
+            &mut world,
+            &app.renderer,
+            &mut bvh,
+            true,
+            incr_num_planets(&mut num_planets),
+            0,
+            0,
+            109.17,
+            0.01,
+            0.0,
+            0.0,
+            app.renderer.get_texture_id_from_name("sun").unwrap(),
         );
-        world
-            .insert(
-                player_entity,
-                (Player {
-                    bvh_node_id: player_node_id,
-                },),
-            )
-            .unwrap();
 
-        // Add water plane
-        let scale_vec = nalgebra_glm::vec3(MAP_WIDTH as f32, MAP_WIDTH as f32, MAP_WIDTH as f32);
-        let water_entity = world.spawn((ModelComponent::new(
-            quad_mesh,
-            water_texture,
-            nalgebra_glm::vec3(0.0, 0.0, 0.5),
-            scale_vec,
-        ),));
-        bvh.insert(
-            water_entity,
-            app.renderer
-                .get_mesh_aabb(quad_mesh)
-                .scale(scale_vec)
-                .translate(nalgebra_glm::vec3(0.0, 0.0, 0.5)),
+        let _planet_planet_id = Planet::new(
+            &mut world,
+            &app.renderer,
+            &mut bvh,
+            false,
+            incr_num_planets(&mut num_planets),
+            sun_planet_id,
+            1,
+            1.,
+            2348.660,
+            1.0,
+            0.0027,
+            app.renderer.get_texture_id_from_name("earth").unwrap(),
         );
 
         Self {
             world,
             camera_3d: Camera::new(
-                spawn_point,
-                nalgebra_glm::vec3(MAP_WIDTH as f32 / 2.0, MAP_WIDTH as f32 / 2.0, 0.5),
+                nalgebra_glm::vec3(1.0, 0.0, 1.0),
+                nalgebra_glm::vec3(0.0, 0.0, 0.0),
                 nalgebra_glm::vec3(0.0, 0.0, 1.0),
                 ProjectionKind::Perspective { fov: 0.65 },
             ),
             bvh,
-            map,
             directional_light: DirectionalLightSource::new(
                 Camera::new(
-                    nalgebra_glm::vec3(MAP_WIDTH as f32 / -2.0, 0.0, 2.0),
-                    nalgebra_glm::vec3(MAP_WIDTH as f32 / 2.0, MAP_WIDTH as f32 / 2.0, 0.5),
+                    nalgebra_glm::vec3(0.0, 0.0, 0.0),
+                    nalgebra_glm::vec3(0.0, 10.0, 0.0),
                     nalgebra_glm::vec3(0.0, 0.0, 1.0),
                     ProjectionKind::Orthographic {
                         // These do not matter for now, they're reset later
@@ -265,143 +206,122 @@ impl Gameplay {
                         far: 0.0,
                     },
                 ),
-                nalgebra_glm::vec3(-0.1, 0.0, 0.86),
-                MAP_WIDTH as i32,
+                nalgebra_glm::vec3(-1.0, 0.0, 0.0),
+                1024,
             ),
 
-            position: spawn_point,
-            velocity: nalgebra_glm::vec3(0.0, 0.0, 0.0),
-
-            prev_space_state: false,
-            debug: false,
-            update_swap: 0,
+            selection: 0,
+            selected_pos: nalgebra_glm::vec3(0.0, 0.0, 0.0),
+            prev_selected_pos: nalgebra_glm::vec3(0.0, 0.0, 0.0),
+            transition: 1.0,
+            selected_body_radius: 0.0,
+            phi: 2.5,
+            theta: 0.0,
+            distance: 20.0,
+            prev_enter_state: false,
+            number_planets: num_planets,
         }
     }
 
-    fn update_view(&mut self, app: &App) {
-        let mut player_entt: Option<Entity> = None;
-        for (entt, _) in &mut self.world.query::<&Player>() {
-            player_entt = Some(entt);
-            break;
+    /// Changes various game state based on user mouse and keyboard input
+    fn control(&mut self, app: &App) {
+        let curr_enter_state = app.keys[Scancode::Return as usize];
+        if curr_enter_state && !self.prev_enter_state {
+            self.selection += 1;
+            self.selected_body_radius = 0.0;
+            self.prev_selected_pos = self.selected_pos;
+            self.transition = app.seconds;
+            if self.selection >= self.number_planets {
+                self.selection = 0;
+            }
         }
-        let zoom = 1.0;
+        self.prev_enter_state = curr_enter_state;
 
-        let curr_w_state = app.keys[Scancode::W as usize];
-        let curr_s_state = app.keys[Scancode::S as usize];
-        let curr_a_state = app.keys[Scancode::A as usize];
-        let curr_d_state = app.keys[Scancode::D as usize];
-        let curr_space_state = app.keys[Scancode::Space as usize];
-        let walking = curr_w_state || curr_s_state || curr_a_state || curr_d_state;
-        let walk_speed: f32 = 1.6 * 2.5 * zoom;
-        let facing_vec = nalgebra_glm::vec3(1.0, 0.0, 0.0);
-        let sideways_vec = nalgebra_glm::vec3(0.0, 1.0, 0.0);
-        let mut player_vel_vec: nalgebra_glm::Vec3 = nalgebra_glm::zero();
-        if curr_w_state {
-            player_vel_vec += -facing_vec;
+        let control_speed = 0.005;
+        let zoom_control_speed = 0.15 * (self.distance - self.selected_body_radius);
+        if app.mouse_left_down {
+            self.phi -= control_speed * (app.mouse_vel.x as f32);
+            self.theta = (self.theta - control_speed * (app.mouse_vel.y as f32))
+                .max(control_speed - PI / 2.0)
+                .min(PI / 2.0 - control_speed);
         }
-        if curr_s_state {
-            player_vel_vec += facing_vec;
-        }
-        if curr_a_state {
-            player_vel_vec += -sideways_vec;
-        }
-        if curr_d_state {
-            player_vel_vec += sideways_vec;
-        }
-        self.debug = false;
-        if curr_space_state && !self.prev_space_state {
-        } else if walking {
-            // Move the player, this way moving diagonal isn't faster
-            self.velocity +=
-                player_vel_vec.normalize() * walk_speed * 4.317 * UNIT_PER_METER / 62.5;
-        }
-        self.prev_space_state = curr_space_state;
-        self.position += self.velocity;
-        self.position.z = self.map.height_interpolated(self.position.xy());
-
-        let mut model = self
-            .world
-            .get::<&mut ModelComponent>(player_entt.unwrap())
-            .unwrap();
-        model.set_position(self.position);
-        let player_bvh_node_id = self
-            .world
-            .get::<&Player>(player_entt.unwrap())
-            .unwrap()
-            .bvh_node_id;
-        self.bvh.move_obj(
-            player_bvh_node_id,
-            &app.renderer.get_model_aabb(&model),
-            &self.velocity,
-        );
-        self.velocity *= 0.8; // friction
-
-        self.camera_3d
-            .set_position(self.position + nalgebra_glm::vec3(13.85, 0.0, 8.00) * zoom);
-        self.camera_3d.set_lookat(self.position);
-
-        app.renderer.set_camera(self.camera_3d);
+        self.distance = (self.distance - zoom_control_speed * (app.mouse_wheel as f32))
+            .max(self.selected_body_radius * 2.0)
+            .min(self.selected_body_radius * 3.0 + 234.0);
     }
 
-    fn update_clickers(&mut self, app: &App) {
-        if app.mouse_left_clicked {
-            println!("{:?} {:?}", app.mouse_pos.x, app.mouse_pos.y);
-        }
-        let ndc_x = (2.0 * app.mouse_pos.x as f32) / app.window_size.x as f32 - 1.0;
-        let ndc_y = 1.0 - (2.0 * (app.mouse_pos.y as f32)) / app.window_size.y as f32;
-
-        let clip_coordinates = nalgebra_glm::vec4(ndc_x, ndc_y, -0.0, 1.0);
-
-        let (inv_proj, inv_view) = self.camera_3d.inv_proj_and_view();
-        let mut eye_coords = inv_proj * clip_coordinates;
-        eye_coords /= eye_coords.w;
-
-        let world_coords = inv_view * eye_coords;
-        let dir = (world_coords.xyz() - self.camera_3d.position()).normalize();
-
-        let ray = Ray {
-            dir,
-            origin: self.camera_3d.position(),
-        };
-
-        // Set all outlines to false
-        for (_, model) in &mut self.world.query::<&mut ModelComponent>() {
-            model.outlined = false;
-        }
-
-        // Set hovered outlines to true
-        let hovereds: Vec<Entity> = self
-            .bvh
-            .iter_ray(&ray)
-            .filter(|entity| self.world.get::<&Rock>(*entity).is_ok())
+    /// Updates planets based on their on-rails orbits around their parent bodies
+    fn planet_system(&mut self, app: &App, tier: u32) {
+        let planet_pos: Vec<nalgebra_glm::Vec3> = self
+            .world
+            .query::<(&Planet, &ModelComponent)>()
+            .iter()
+            .map(|(_enitity, (_planet, model))| model.get_position())
             .collect();
-        for entity in hovereds {
-            self.world
-                .get::<&mut ModelComponent>(entity)
-                .unwrap()
-                .outlined = true;
-            if app.mouse_left_clicked {
-                println!("{:?}", entity);
+
+        for (_entity, (model, planet)) in
+            self.world.query_mut::<(&mut ModelComponent, &mut Planet)>()
+        {
+            if planet.tier != tier {
+                continue;
+            }
+
+            const REAL_SECS_PER_GAME_YEAR: f32 = 60.0; // How many real seconds it takes for earth to go around the sun once
+            const T_SEED: f32 = 98400.0; // An offset from t, so that the planets are not all in a line.
+            let t = app.seconds;
+            let parent_pos = planet_pos[planet.parent_planet_id];
+
+            if planet.tier != 0 && app.ticks % 100 == 0 {
+                let new_pos = nalgebra_glm::vec3(
+                    (2.0 * PI * (t + T_SEED)
+                        / (REAL_SECS_PER_GAME_YEAR * planet.orbital_time_years))
+                        .cos()
+                        * planet.orbital_radius
+                        + parent_pos.x,
+                    (2.0 * PI * (t + T_SEED)
+                        / (REAL_SECS_PER_GAME_YEAR * planet.orbital_time_years))
+                        .sin()
+                        * planet.orbital_radius
+                        + parent_pos.y,
+                    0.0,
+                );
+                let vel = new_pos - model.get_position();
+                model.set_position(new_pos);
+                self.bvh.move_obj(
+                    planet.bvh_node_id,
+                    &app.renderer.get_model_aabb(&model),
+                    &vel,
+                );
+            }
+            if planet.day_time_years != 0.0 {
+                planet.rotation = 2.0 * PI * (t + T_SEED)
+                    / (REAL_SECS_PER_GAME_YEAR * planet.day_time_years)
+                    + 3.14;
+            }
+
+            if planet.id == self.selection {
+                self.selected_pos = model.get_position();
+                self.selected_body_radius = planet.body_radius;
             }
         }
     }
 
-    fn render_outline_text(&mut self, app: &App) {
-        let hovereds: Vec<Entity> = self
-            .bvh
-            .iter_frustrum(&self.camera_3d.frustum(), false)
-            .filter(|entity| {
-                if let Ok(model) = self.world.get::<&ModelComponent>(*entity) {
-                    model.outlined
-                } else {
-                    false
-                }
-            })
-            .collect();
-
-        for entity in hovereds {
-            // TODO: Convert from 2d/3d points in camera, both ways
-            app.renderer.draw_text(app.mouse_pos, "This is a rock!");
-        }
+    /// Updates the camera position and lookat based on mouse panning and body selection
+    fn camera_update(&mut self, app: &App) {
+        let rot_matrix = nalgebra_glm::rotate_y(
+            &nalgebra_glm::rotate_z(&nalgebra_glm::one(), self.phi),
+            self.theta,
+        );
+        let transition = cubic_ease_out((app.seconds - self.transition).min(1.0));
+        let offset = (1.0 - transition) * self.prev_selected_pos + transition * self.selected_pos;
+        self.camera_3d.set_position(
+            (rot_matrix * nalgebra_glm::vec4(self.distance, 0., 0., 0.)).xyz() + offset,
+        );
+        self.camera_3d.set_lookat(self.selected_pos);
     }
+}
+
+/// Cubic easing out function - for animation
+fn cubic_ease_out(t: f32) -> f32 {
+    1.0 - (1.0 - t).powf(30.0)
 }
