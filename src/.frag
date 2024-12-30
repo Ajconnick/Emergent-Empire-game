@@ -2,6 +2,7 @@
 
 in vec3 texCoord;
 in vec3 Position_worldspace;
+in vec3 Position_viewspace;
 in vec3 Normal_cameraspace;
 in vec3 LightDirection_cameraspace;
 in vec3 EyeDirection_cameraspace;
@@ -20,7 +21,7 @@ void main()
     vec2 idx = vec2(int(texCoord.x * 24.0) / 24.0, int(texCoord.y * 24.0) / 24.0);
     vec3 MaterialDiffuseColor = texture(texture0, idx).xyz;
 
-    if (length(Position_worldspace) >= 10000.0) {
+    if (length(Position_worldspace) >= 1000.0) {
         Color = MaterialDiffuseColor; // If it's so far away, just shade it all one color
         return;
     }

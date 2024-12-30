@@ -12,6 +12,7 @@ uniform mat4 u_proj_matrix;
 
 out vec3 texCoord;
 out vec3 Position_worldspace;
+out vec3 Position_viewspace;
 out vec3 Normal_cameraspace;
 out vec3 LightDirection_cameraspace;
 out vec3 EyeDirection_cameraspace;
@@ -28,6 +29,7 @@ void main()
     vec4 uv = u_proj_matrix * view_pos;
 
     Position_worldspace = mod_pos.xyz;
+    Position_worldspace = view_pos.xyz;
 
     if (u_resolution.x > u_resolution.y) {
         uv.x *= u_resolution.y / u_resolution.x;

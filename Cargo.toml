@@ -6,8 +6,20 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+apricot = { git = "https://github.com/Rakhyvel/apricot.git" }
+sdl2 = { version = "0.34.5", features = ["bundled", "ttf", "mixer"], default-features = false }
 gl = "*"
-sdl2 = { version = "*", features = ["bundled"] }
 nalgebra-glm = "*"
-obj-rs = "*"
+hecs = "*"
+
+# For reading in textures
 image = "0.25.1"
+
+# For random numbers
+rand = "0.8.4"
+
+# For reading .obj files into meshes
+obj-rs = "*"
+
+# For time, lol
+chrono = "0.4"
