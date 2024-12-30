@@ -68,6 +68,7 @@ dependencies = [
 [[package]]
 name = "apricot"
 version = "0.1.0"
+source = "git+https://github.com/Rakhyvel/apricot.git#c477066c9f067244edebee668c1ab1333501c4d2"
 dependencies = [
  "chrono",
  "gl",
