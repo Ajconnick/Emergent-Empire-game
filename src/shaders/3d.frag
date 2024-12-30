@@ -82,10 +82,10 @@ void main()
     float diff = cosTheta * shadow_factor;
     diff = floor(diff * levels) / levels;
 
-    vec3 color = mix(shadow, light_tinted, 1.0);
+    vec3 color = mix(shadow, light_tinted, diff);
 
     color = color / (color + vec3(1.0));
     color = pow(color, vec3(1.0 / 2.2));
 
-    Color = vec4(material_color, texture_alpha);
+    Color = vec4(color, texture_alpha);
 }
