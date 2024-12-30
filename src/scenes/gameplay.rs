@@ -6,7 +6,7 @@ use apricot::{
     app::{App, Scene},
     bvh::BVH,
     camera::{Camera, ProjectionKind},
-    objects::create_program,
+    opengl::create_program,
     render_core::ModelComponent,
     shadow_map::DirectionalLightSource,
 };
