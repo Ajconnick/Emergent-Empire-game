@@ -3,7 +3,7 @@
 
 use apricot::{
     bvh::{BVHNodeId, BVH},
-    render_core::{ModelComponent, RenderContext, TextureId},
+    render_core::{LinePathComponent, ModelComponent, RenderContext, TextureId},
 };
 use hecs::{Entity, World};
 
@@ -46,12 +46,10 @@ impl Planet {
         let position = nalgebra_glm::vec3(0., 0., 0.);
         let scale_vec = nalgebra_glm::vec3(body_radius, body_radius, body_radius);
 
-        let planet_entity = world.spawn((ModelComponent::new(
-            planet_mesh,
-            texture_id,
-            position,
-            scale_vec,
-        ),));
+        let planet_entity = world.spawn((
+            ModelComponent::new(planet_mesh, texture_id, position, scale_vec),
+            LinePathComponent::from_orbit(orbital_radius, 0.0, 1024),
+        ));
         let bvh_node_id = bvh.insert(
             planet_entity,
             renderer
@@ -77,6 +75,7 @@ impl Planet {
                 },),
             )
             .unwrap();
+
         id
     }
 }

@@ -8,7 +8,7 @@ use apricot::{
     camera::{Camera, ProjectionKind},
     opengl::create_program,
     rectangle::Rectangle,
-    render_core::ModelComponent,
+    render_core::{LinePathComponent, ModelComponent},
     shadow_map::DirectionalLightSource,
 };
 use hecs::{Entity, World};
@@ -103,6 +103,8 @@ impl Scene for Gameplay {
             ),
             format!("turn: {}", self.turn).to_string().as_str(),
         );
+
+        app.renderer.render_3d_line_paths(&self.world);
     }
 }
 
@@ -160,6 +162,14 @@ impl Gameplay {
             .unwrap(),
             Some("3d-solid"),
         );
+        app.renderer.add_program(
+            create_program(
+                include_str!("../shaders/line.vert"),
+                include_str!("../shaders/solid-color.frag"),
+            )
+            .unwrap(),
+            Some("line"),
+        );
 
         // Setup the mesh manager
         app.renderer
@@ -195,7 +205,7 @@ impl Gameplay {
             0,
             0,
             100.0,
-            0.01,
+            0.0,
             0.0,
             0.0,
             app.renderer.get_texture_id_from_name("sun").unwrap(),
@@ -317,7 +327,7 @@ impl Gameplay {
         }
         self.distance = (self.distance - zoom_control_speed * (app.mouse_wheel as f32))
             .max(self.selected_body_radius * 2.0)
-            .min(self.selected_body_radius * 7.0 + 234.0);
+            .min(self.selected_body_radius * 40000.0 + 234.0);
     }
 
     /// Updates planets based on their on-rails orbits around their parent bodies
@@ -329,14 +339,15 @@ impl Gameplay {
             .map(|(_enitity, (_planet, model))| model.get_position())
             .collect();
 
-        for (_entity, (model, planet)) in
-            self.world.query_mut::<(&mut ModelComponent, &mut Planet)>()
+        for (_entity, (model, planet, orbit)) in
+            self.world
+                .query_mut::<(&mut ModelComponent, &mut Planet, &mut LinePathComponent)>()
         {
             if planet.tier != tier {
                 continue;
             }
 
-            const REAL_SECS_PER_GAME_YEAR: f32 = 600.0; // How many real seconds it takes for earth to go around the sun once
+            const REAL_SECS_PER_GAME_YEAR: f32 = 6000.0; // How many real seconds it takes for earth to go around the sun once
             const T_SEED: f32 = 98400.0; // An offset from t, so that the planets are not all in a line.
             let t = app.seconds;
             let parent_pos = planet_pos[planet.parent_planet_id];
@@ -362,6 +373,7 @@ impl Gameplay {
                     &app.renderer.get_model_aabb(&model),
                     &vel,
                 );
+                orbit.position = new_pos;
             }
             if planet.day_time_years != 0.0 {
                 planet.rotation = 2.0 * PI * (t + T_SEED)
