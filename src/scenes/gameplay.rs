@@ -7,13 +7,14 @@ use apricot::{
     bvh::BVH,
     camera::{Camera, ProjectionKind},
     opengl::create_program,
+    rectangle::Rectangle,
     render_core::ModelComponent,
     shadow_map::DirectionalLightSource,
 };
 use hecs::{Entity, World};
 use sdl2::keyboard::Scancode;
 
-use crate::components::planet::Planet;
+use crate::components::{button::Button, planet::Planet};
 
 /// Object file data, used for meshes
 pub const QUAD_XY_DATA: &[u8] = include_bytes!("../../res/quad-xy.obj");
@@ -53,6 +54,8 @@ pub struct Gameplay {
     prev_enter_state: bool,
     /// How many planets there are
     number_planets: usize,
+
+    turn: usize,
 }
 
 impl Scene for Gameplay {
@@ -80,14 +83,26 @@ impl Scene for Gameplay {
             false,
         );
 
+        let font = app.renderer.get_font_id_from_name("font").unwrap();
+        app.renderer.set_font(font);
         for (_entity, planet) in self.world.query::<&Planet>().iter() {
             if planet.id == self.selection {
-                let font = app.renderer.get_font_id_from_name("font").unwrap();
-                app.renderer.set_font(font);
                 app.renderer
                     .draw_text(nalgebra_glm::vec2(10.0, 10.0), &planet.name);
             }
         }
+
+        for (_entity, button) in self.world.query::<&Button>().iter() {
+            button.update(app);
+        }
+
+        app.renderer.draw_text(
+            nalgebra_glm::vec2(
+                app.window_size.x as f32 - 90.0,
+                app.window_size.y as f32 - 20.0,
+            ),
+            format!("turn: {}", self.turn).to_string().as_str(),
+        );
     }
 }
 
@@ -159,6 +174,10 @@ impl Gameplay {
             .add_texture_from_png("res/earth.png", Some("earth"));
         app.renderer
             .add_texture_from_png("res/moon.png", Some("moon"));
+        app.renderer
+            .add_texture_from_png("res/next-turn.png", Some("next-turn"));
+        app.renderer
+            .add_texture_from_png("res/next-turn-hover.png", Some("next-turn-hover"));
 
         // Setup the font manager
         app.renderer
@@ -175,7 +194,7 @@ impl Gameplay {
             incr_num_planets(&mut num_planets),
             0,
             0,
-            109.17,
+            100.0,
             0.01,
             0.0,
             0.0,
@@ -192,7 +211,7 @@ impl Gameplay {
             sun_planet_id,
             1,
             1.,
-            23486.0,
+            20000.0,
             1.0,
             0.0027,
             app.renderer.get_texture_id_from_name("earth").unwrap(),
@@ -207,13 +226,26 @@ impl Gameplay {
             incr_num_planets(&mut num_planets),
             planet_planet_id,
             2,
-            0.272,
-            60.34,
+            0.2,
+            60.0,
             0.0749,
             0.0749,
             app.renderer.get_texture_id_from_name("moon").unwrap(),
             "Moon",
         );
+
+        world.spawn((Button::new(
+            Rectangle::new(
+                app.window_size.x as f32 - 100.0,
+                app.window_size.y as f32 - 120.0,
+                90.0,
+                90.0,
+            ),
+            app.renderer.get_texture_id_from_name("next-turn").unwrap(),
+            app.renderer
+                .get_texture_id_from_name("next-turn-hover")
+                .unwrap(),
+        ),));
 
         Self {
             world,
@@ -256,6 +288,8 @@ impl Gameplay {
             distance: 20.0,
             prev_enter_state: false,
             number_planets: num_planets,
+
+            turn: 0,
         }
     }
 
@@ -283,7 +317,7 @@ impl Gameplay {
         }
         self.distance = (self.distance - zoom_control_speed * (app.mouse_wheel as f32))
             .max(self.selected_body_radius * 2.0)
-            .min(self.selected_body_radius * 3.0 + 234.0);
+            .min(self.selected_body_radius * 7.0 + 234.0);
     }
 
     /// Updates planets based on their on-rails orbits around their parent bodies
