@@ -62,6 +62,7 @@ pub struct Gameplay {
     event_queue: Arc<EventQueue>,
 
     turn: usize,
+    turn_transition_time: f32,
 }
 
 impl Scene for Gameplay {
@@ -78,8 +79,11 @@ impl Scene for Gameplay {
                 // Handle all the buttons
                 Event::ButtonClicked(id) => match id {
                     "next-turn" => {
-                        self.turn += 1;
-                        println!("doing the next turn!")
+                        if (app.seconds - self.turn_transition_time) >= 1.0 {
+                            self.turn += 1;
+                            self.turn_transition_time = app.seconds;
+                            println!("doing the next turn!")
+                        }
                     }
                     _ => panic!("unknown button id: {:?}", id),
                 },
@@ -236,7 +240,7 @@ impl Gameplay {
             false,
             sun_entity,
             1,
-            1.,
+            0.375,
             10000.0,
             1.0,
             0.0027,
@@ -266,7 +270,7 @@ impl Gameplay {
             false,
             planet_entity,
             2,
-            0.2,
+            0.72,
             60.0,
             0.0749,
             0.0749,
@@ -336,6 +340,7 @@ impl Gameplay {
             event_queue: event_queue.clone(),
 
             turn: 0,
+            turn_transition_time: 1.0,
         }
     }
 
@@ -344,7 +349,7 @@ impl Gameplay {
         let curr_enter_state = app.keys[Scancode::Return as usize];
         if curr_enter_state && !self.prev_enter_state {
             self.selection += 1;
-            self.selected_body_radius = 0.0;
+            self.selected_body_radius = 100.0;
             self.prev_selected_pos = self.selected_pos;
             self.transition = app.seconds;
             if self.selection >= self.bodies.len() {
@@ -361,6 +366,7 @@ impl Gameplay {
                 .max(control_speed - PI / 2.0)
                 .min(PI / 2.0 - control_speed);
         }
+
         self.distance = (self.distance - zoom_control_speed * (app.mouse_wheel as f32))
             .max(self.selected_body_radius * 2.0)
             .min(self.selected_body_radius * 40000.0 + 234.0);
@@ -380,9 +386,10 @@ impl Gameplay {
                 continue;
             }
 
-            const REAL_SECS_PER_GAME_YEAR: f32 = 6.0; // How many real seconds it takes for earth to go around the sun once
+            const REAL_SECS_PER_GAME_YEAR: f32 = 60.0; // How many turns it takes for earth to go around the sun once
             const T_SEED: f32 = 98400.0; // An offset from t, so that the planets are not all in a line.
-            let t = self.turn as f32;
+            let t = self.turn as f32
+                + cubic_ease_out((app.seconds - self.turn_transition_time).min(1.0));
 
             if planet.tier != 0 {
                 let parent_pos = parent_pos_map.get(&planet.parent_planet_id).unwrap();
@@ -429,15 +436,13 @@ impl Gameplay {
             parent_pos_map.insert(entity, model.get_position());
         }
 
-        for (_entity, (planet, orbit)) in
-            self.world.query_mut::<(&Planet, &mut LinePathComponent)>()
+        for (entity, (planet, orbit)) in self.world.query_mut::<(&Planet, &mut LinePathComponent)>()
         {
-            let camera_distance = self.distance;
             let parent_pos = parent_pos_map.get(&planet.parent_planet_id).unwrap();
-            orbit.color.w = if camera_distance < 5.0 * planet.body_radius {
-                0.0
+            orbit.color.w = if entity == self.bodies[self.selection] {
+                0.8
             } else {
-                camera_distance / (planet.body_radius * 8.0).powf(5.0)
+                0.2
             };
             orbit.position = *parent_pos;
         }
@@ -451,9 +456,6 @@ impl Gameplay {
         );
         let transition = cubic_ease_out((app.seconds - self.transition).min(1.0));
         let offset = (1.0 - transition) * self.prev_selected_pos + transition * self.selected_pos;
-        // TODO: It's convenient to have planet model space be opengl-model-space, but there's a lot of floating point jitter.
-        //       It also affects lighting and makes it weird, which is why it's turned off for this PR.
-        //       We'll need opengl-model-space be centered at the selected body's position.
         self.camera_3d.set_position(
             (rot_matrix * nalgebra_glm::vec4(self.distance, 0., 0., 0.)).xyz() + offset,
         );
@@ -463,5 +465,5 @@ impl Gameplay {
 
 /// Cubic easing out function - for animation
 fn cubic_ease_out(t: f32) -> f32 {
-    1.0 - (1.0 - t).powf(30.0)
+    1.0 - (1.0 - t).powf(3.0)
 }
