@@ -1,6 +1,6 @@
 //! This module is responsible for defining the gameplay scene.
 
-use std::{collections::HashMap, f32::consts::PI};
+use std::{collections::HashMap, f32::consts::PI, sync::Arc};
 
 use apricot::{
     app::{App, Scene},
@@ -14,7 +14,10 @@ use apricot::{
 use hecs::{Entity, World};
 use sdl2::keyboard::Scancode;
 
-use crate::components::{button::Button, planet::Planet};
+use crate::components::{
+    button::{Button, Event, EventQueue},
+    planet::Planet,
+};
 
 /// Object file data, used for meshes
 pub const QUAD_XY_DATA: &[u8] = include_bytes!("../../res/quad-xy.obj");
@@ -55,12 +58,32 @@ pub struct Gameplay {
     /// How many planets there are
     bodies: Vec<Entity>,
 
+    event_queue: Arc<EventQueue>,
+
     turn: usize,
 }
 
 impl Scene for Gameplay {
     /// Update the scene every tick
     fn update(&mut self, app: &App) {
+        // Have an event queue, go through all GUI elements that trigger events, then loop through all events and
+        // process them
+        for (_entity, button) in self.world.query_mut::<&mut Button>() {
+            button.update(app);
+        }
+
+        while let Some(event) = self.event_queue.pop() {
+            match event {
+                Event::ButtonClicked(id) => match id {
+                    "next-turn" => {
+                        self.turn += 1;
+                        println!("doing the next turn!")
+                    }
+                    _ => panic!("unknown button id: {:?}", id),
+                },
+            }
+        }
+
         self.control(app);
         self.planet_system(app, 0);
         self.planet_system(app, 1);
@@ -94,7 +117,7 @@ impl Scene for Gameplay {
         }
 
         for (_entity, button) in self.world.query_mut::<&mut Button>() {
-            button.update(app);
+            button.render(app);
         }
 
         app.renderer.draw_text(
@@ -249,7 +272,10 @@ impl Gameplay {
             "Moon",
         );
 
+        let event_queue = Arc::new(EventQueue::new());
+
         world.spawn((Button::new(
+            "next-turn",
             Rectangle::new(
                 app.window_size.x as f32 - 100.0,
                 app.window_size.y as f32 - 120.0,
@@ -260,6 +286,7 @@ impl Gameplay {
             app.renderer
                 .get_texture_id_from_name("next-turn-hover")
                 .unwrap(),
+            event_queue.clone(),
         ),));
 
         Self {
@@ -303,6 +330,8 @@ impl Gameplay {
             distance: 20.0,
             prev_enter_state: false,
             bodies: vec![sun_entity, mercury_entity, planet_entity, moon_entity],
+
+            event_queue: event_queue.clone(),
 
             turn: 0,
         }
@@ -406,7 +435,7 @@ impl Gameplay {
             orbit.color.w = if camera_distance < 5.0 * planet.body_radius {
                 0.0
             } else {
-                camera_distance / (planet.body_radius * 20.0).powf(3.0)
+                camera_distance / (planet.body_radius * 8.0).powf(5.0)
             };
             orbit.position = *parent_pos;
         }
