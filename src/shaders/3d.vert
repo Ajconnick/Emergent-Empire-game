@@ -21,10 +21,6 @@ void main()
 {
     vec4 mod_pos = u_model_matrix * vec4(Position, 1.0);
     vec4 view_pos = u_view_matrix * mod_pos;
-    float d = 1000.0;
-    if (length(view_pos.xyz) >= d) {
-        view_pos = vec4(normalize(view_pos.xyz) * d, 1.0);
-    }
     vec4 uv = u_proj_matrix * view_pos;
 
     // Vertex normal, converted to camera space
