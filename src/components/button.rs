@@ -15,8 +15,11 @@ impl Button {
         }
     }
 
-    pub fn update(&self, app: &App) {
+    pub fn update(&mut self, app: &App) {
         let turn_hovered = self.rect.contains_point(&app.mouse_pos);
+        if turn_hovered && app.mouse_left_clicked {
+            println!("clicked...");
+        }
         app.renderer.copy_texture(
             self.rect,
             if turn_hovered {

@@ -1,6 +1,6 @@
 //! This module is responsible for defining the gameplay scene.
 
-use std::f32::consts::PI;
+use std::{collections::HashMap, f32::consts::PI};
 
 use apricot::{
     app::{App, Scene},
@@ -53,7 +53,7 @@ pub struct Gameplay {
     /// Used for enter key latch
     prev_enter_state: bool,
     /// How many planets there are
-    number_planets: usize,
+    bodies: Vec<Entity>,
 
     turn: usize,
 }
@@ -65,6 +65,7 @@ impl Scene for Gameplay {
         self.planet_system(app, 0);
         self.planet_system(app, 1);
         self.planet_system(app, 2);
+        self.orbit_system(app);
         self.camera_update(app);
     }
 
@@ -85,14 +86,14 @@ impl Scene for Gameplay {
 
         let font = app.renderer.get_font_id_from_name("font").unwrap();
         app.renderer.set_font(font);
-        for (_entity, planet) in self.world.query::<&Planet>().iter() {
-            if planet.id == self.selection {
+        for (entity, planet) in self.world.query::<&Planet>().iter() {
+            if entity == self.bodies[self.selection] {
                 app.renderer
                     .draw_text(nalgebra_glm::vec2(10.0, 10.0), &planet.name);
             }
         }
 
-        for (_entity, button) in self.world.query::<&Button>().iter() {
+        for (_entity, button) in self.world.query_mut::<&mut Button>() {
             button.update(app);
         }
 
@@ -106,13 +107,6 @@ impl Scene for Gameplay {
 
         app.renderer.render_3d_line_paths(&self.world);
     }
-}
-
-/// Increments a counter and returns the previous value
-fn incr_num_planets(num: &mut usize) -> usize {
-    let tmp = *num;
-    *num += 1;
-    tmp
 }
 
 impl Gameplay {
@@ -195,16 +189,14 @@ impl Gameplay {
 
         let mut bvh = BVH::<Entity>::new();
 
-        let mut num_planets: usize = 0;
-        let sun_planet_id = Planet::new(
+        let sun_entity = Planet::new(
             &mut world,
             &app.renderer,
             &mut bvh,
             true,
-            incr_num_planets(&mut num_planets),
+            Entity::DANGLING,
             0,
-            0,
-            100.0,
+            110.0,
             0.0,
             0.0,
             0.0,
@@ -212,13 +204,27 @@ impl Gameplay {
             "Sun",
         );
 
-        let planet_planet_id = Planet::new(
+        let mercury_entity = Planet::new(
             &mut world,
             &app.renderer,
             &mut bvh,
             false,
-            incr_num_planets(&mut num_planets),
-            sun_planet_id,
+            sun_entity,
+            1,
+            1.,
+            10000.0,
+            1.0,
+            0.0027,
+            app.renderer.get_texture_id_from_name("moon").unwrap(),
+            "Mercury",
+        );
+
+        let planet_entity = Planet::new(
+            &mut world,
+            &app.renderer,
+            &mut bvh,
+            false,
+            sun_entity,
             1,
             1.,
             20000.0,
@@ -228,13 +234,12 @@ impl Gameplay {
             "Earth",
         );
 
-        let _moon_planet_id = Planet::new(
+        let moon_entity = Planet::new(
             &mut world,
             &app.renderer,
             &mut bvh,
             false,
-            incr_num_planets(&mut num_planets),
-            planet_planet_id,
+            planet_entity,
             2,
             0.2,
             60.0,
@@ -288,7 +293,7 @@ impl Gameplay {
                 1024,
             ),
 
-            selection: 1,
+            selection: 2,
             selected_pos: nalgebra_glm::vec3(0.0, 0.0, 0.0),
             prev_selected_pos: nalgebra_glm::vec3(0.0, 0.0, 0.0),
             transition: 1.0,
@@ -297,7 +302,7 @@ impl Gameplay {
             theta: 0.0,
             distance: 20.0,
             prev_enter_state: false,
-            number_planets: num_planets,
+            bodies: vec![sun_entity, mercury_entity, planet_entity, moon_entity],
 
             turn: 0,
         }
@@ -311,7 +316,7 @@ impl Gameplay {
             self.selected_body_radius = 0.0;
             self.prev_selected_pos = self.selected_pos;
             self.transition = app.seconds;
-            if self.selection >= self.number_planets {
+            if self.selection >= self.bodies.len() {
                 self.selection = 0;
             }
         }
@@ -332,27 +337,24 @@ impl Gameplay {
 
     /// Updates planets based on their on-rails orbits around their parent bodies
     fn planet_system(&mut self, app: &App, tier: u32) {
-        let planet_pos: Vec<nalgebra_glm::Vec3> = self
-            .world
-            .query::<(&Planet, &ModelComponent)>()
-            .iter()
-            .map(|(_enitity, (_planet, model))| model.get_position())
-            .collect();
+        let mut parent_pos_map = HashMap::new();
+        for (entity, (model, _planet)) in self.world.query::<(&ModelComponent, &Planet)>().iter() {
+            parent_pos_map.insert(entity, model.get_position());
+        }
 
-        for (_entity, (model, planet, orbit)) in
-            self.world
-                .query_mut::<(&mut ModelComponent, &mut Planet, &mut LinePathComponent)>()
+        for (entity, (model, planet)) in
+            self.world.query_mut::<(&mut ModelComponent, &mut Planet)>()
         {
             if planet.tier != tier {
                 continue;
             }
 
-            const REAL_SECS_PER_GAME_YEAR: f32 = 6000.0; // How many real seconds it takes for earth to go around the sun once
+            const REAL_SECS_PER_GAME_YEAR: f32 = 6.0; // How many real seconds it takes for earth to go around the sun once
             const T_SEED: f32 = 98400.0; // An offset from t, so that the planets are not all in a line.
-            let t = app.seconds;
-            let parent_pos = planet_pos[planet.parent_planet_id];
+            let t = self.turn as f32;
 
             if planet.tier != 0 {
+                let parent_pos = parent_pos_map.get(&planet.parent_planet_id).unwrap();
                 let new_pos = nalgebra_glm::vec3(
                     (2.0 * PI * (t + T_SEED)
                         / (REAL_SECS_PER_GAME_YEAR * planet.orbital_time_years))
@@ -373,18 +375,40 @@ impl Gameplay {
                     &app.renderer.get_model_aabb(&model),
                     &vel,
                 );
-                orbit.position = new_pos;
+            } else {
+                model.set_position(nalgebra_glm::vec3(0.0, 0.0, 0.0));
             }
+
             if planet.day_time_years != 0.0 {
                 planet.rotation = 2.0 * PI * (t + T_SEED)
                     / (REAL_SECS_PER_GAME_YEAR * planet.day_time_years)
                     + 3.14;
             }
 
-            if planet.id == self.selection {
+            if entity == self.bodies[self.selection] {
                 self.selected_pos = model.get_position();
                 self.selected_body_radius = planet.body_radius;
             }
+        }
+    }
+
+    fn orbit_system(&mut self, _app: &App) {
+        let mut parent_pos_map = HashMap::new();
+        for (entity, (model, _planet)) in self.world.query::<(&ModelComponent, &Planet)>().iter() {
+            parent_pos_map.insert(entity, model.get_position());
+        }
+
+        for (_entity, (planet, orbit)) in
+            self.world.query_mut::<(&Planet, &mut LinePathComponent)>()
+        {
+            let camera_distance = self.distance;
+            let parent_pos = parent_pos_map.get(&planet.parent_planet_id).unwrap();
+            orbit.color.w = if camera_distance < 5.0 * planet.body_radius {
+                0.0
+            } else {
+                camera_distance / (planet.body_radius * 20.0).powf(3.0)
+            };
+            orbit.position = *parent_pos;
         }
     }
 
