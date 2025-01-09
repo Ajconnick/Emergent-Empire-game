@@ -87,5 +87,5 @@ void main()
     color = color / (color + vec3(1.0));
     color = pow(color, vec3(1.0 / 2.2));
 
-    Color = vec4(material_color, texture_alpha);
+    Color = vec4(color, texture_alpha);
 }
