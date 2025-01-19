@@ -3,13 +3,12 @@
 
 use apricot::{
     bvh::{BVHNodeId, BVH},
-    render_core::{ModelComponent, RenderContext, TextureId},
+    render_core::{LinePathComponent, ModelComponent, RenderContext, TextureId},
 };
 use hecs::{Entity, World};
 
 pub struct Planet {
-    pub id: usize,
-    pub parent_planet_id: usize,
+    pub parent_planet_id: Entity,
     pub tier: u32,
     pub body_radius: f32,
     pub orbital_radius: f32,
@@ -27,8 +26,7 @@ impl Planet {
         bvh: &mut BVH<Entity>,
 
         gaseous: bool,
-        id: usize,
-        parent_planet_id: usize,
+        parent_planet_id: Entity,
         tier: u32,
         body_radius: f32,
         orbital_radius: f32,
@@ -36,7 +34,7 @@ impl Planet {
         day_time_years: f32,
         texture_id: TextureId,
         name: &'static str,
-    ) -> usize {
+    ) -> Entity {
         let planet_mesh = if gaseous {
             renderer.get_mesh_id_from_name("uv").unwrap()
         } else {
@@ -52,6 +50,16 @@ impl Planet {
             position,
             scale_vec,
         ),));
+
+        if orbital_radius > 1.0 {
+            world
+                .insert(
+                    planet_entity,
+                    (LinePathComponent::from_orbit(orbital_radius, 0.0, 1024),),
+                )
+                .unwrap()
+        }
+
         let bvh_node_id = bvh.insert(
             planet_entity,
             renderer
@@ -64,7 +72,6 @@ impl Planet {
             .insert(
                 planet_entity,
                 (Planet {
-                    id,
                     parent_planet_id,
                     tier,
                     body_radius,
@@ -77,6 +84,7 @@ impl Planet {
                 },),
             )
             .unwrap();
-        id
+
+        planet_entity
     }
 }
